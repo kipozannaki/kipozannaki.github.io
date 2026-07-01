@@ -1,125 +1,68 @@
 <!DOCTYPE html>
-<!-- HTML5 文档声明，浏览器按 HTML5 标准解析 -->
+<!-- 首页：6 篇文章列表导航页。复用 style.css 共享样式 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 视口设置，确保移动端正确缩放 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的第一个网站 · GitHub Pages</title>
-    <meta name="description" content="通过 GitHub Pages 部署的第一个静态网页">
-    <style>
-        /* CSS 变量集中管理主题色，方便后续维护与主题切换 */
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --text: #1f2937;
-            --text-light: #6b7280;
-            --bg: #f9fafb;
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-        }
-        /* 重置浏览器默认边距；box-sizing: border-box 让尺寸计算更直观 */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        /* 系统字体栈加载快且原生美观，含中文回退 */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-            color: var(--text);
-            background: var(--bg);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-        /* Hero：渐变背景 + 伪元素装饰圆环，营造现代感且不增加 DOM */
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 100px 20px 140px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
-        .hero::before { width: 300px; height: 300px; top: -100px; right: -100px; }
-        .hero::after { width: 200px; height: 200px; bottom: -80px; left: -50px; }
-        /* clamp 实现响应式字号：移动端 2rem，平板 2.5rem，桌面最大 3.5rem */
-        .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 700; margin-bottom: 16px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); position: relative; }
-        .hero p { font-size: clamp(1rem, 2vw, 1.25rem); opacity: 0.95; max-width: 600px; margin: 0 auto 32px; position: relative; }
-        /* CTA 按钮：胶囊形 + hover 上浮微交互 */
-        .btn {
-            display: inline-block;
-            padding: 14px 36px;
-            background: white;
-            color: var(--primary-dark);
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            position: relative;
-        }
-        .btn:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18); }
-        /* 容器：负 margin 让卡片"上提"覆盖 Hero 底部，形成层次 */
-        .container { max-width: 1100px; margin: -80px auto 80px; padding: 0 20px; position: relative; }
-        /* 卡片网格：auto-fit + minmax 移动端单列，桌面端三列自适应 */
-        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
-        /* 卡片：白底 + 圆角 + 阴影 + hover 上浮增强 */
-        .card {
-            background: white;
-            padding: 32px 24px;
-            border-radius: 16px;
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12); }
-        /* 卡片图标：圆形渐变 + emoji，零依赖视觉装饰 */
-        .card-icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-        }
-        .card h3 { font-size: 1.25rem; margin-bottom: 8px; }
-        .card p { color: var(--text-light); font-size: 0.95rem; }
-        /* 页脚：浅色分隔线 + 居中文字 */
-        footer { text-align: center; padding: 32px 20px; color: var(--text-light); font-size: 0.875rem; border-top: 1px solid #e5e7eb; }
-        footer a { color: var(--primary); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
-    </style>
+    <title>kipozannaki · AI 主题内容站</title>
+    <meta name="description" content="关于 Agent、Skill、Harness/Context/Prompt/Loop Engineering 的 LLM 工程实践">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Hero 区域：渐变主视觉，标题 + 副标题 + CTA -->
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="agent.html">Agent</a>
+            <a href="skill.html">Skill</a>
+            <a href="harness-engineering.html">Harness Engineering</a>
+            <a href="context-engineering.html">Context Engineering</a>
+            <a href="prompt-engineering.html">Prompt Engineering</a>
+            <a href="loop-engineering.html">Loop Engineering</a>
+        </nav>
+    </header>
+
     <section class="hero">
-        <h1>欢迎来到我的网站</h1>
-        <p>这是通过 GitHub Pages 部署的第一个静态网页。免费、快速、简单。</p>
-        <a href="https://pages.github.com" class="btn" target="_blank" rel="noopener">了解更多 →</a>
+        <h1>AI 主题内容站</h1>
+        <p>关于 Agent、Skill、Engineering 实践的探索与沉淀</p>
     </section>
-    <!-- 特性卡片：3 张卡片展示 GitHub Pages 核心优势 -->
+
     <main class="container">
-        <div class="features">
-            <article class="card">
-                <div class="card-icon">⚡</div>
-                <h3>极速部署</h3>
-                <p>推送代码即上线，1-2 分钟构建完成。</p>
-            </article>
-            <article class="card">
-                <div class="card-icon">🔒</div>
-                <h3>自动 HTTPS</h3>
-                <p>Let's Encrypt 免费证书，浏览器锁形标识。</p>
-            </article>
-            <article class="card">
-                <div class="card-icon">🆓</div>
-                <h3>完全免费</h3>
-                <p>公开仓库零成本，1GB 存储、100GB 流量。</p>
-            </article>
+        <div class="articles-grid">
+            <a href="agent.html" class="article-card">
+                <div class="article-icon">🧠</div>
+                <h3>Agent</h3>
+                <p>智能体架构与自主决策</p>
+            </a>
+            <a href="skill.html" class="article-card">
+                <div class="article-icon">🛠️</div>
+                <h3>Skill</h3>
+                <p>AI 工具能力的最小单元</p>
+            </a>
+            <a href="harness-engineering.html" class="article-card">
+                <div class="article-icon">🔧</div>
+                <h3>Harness Engineering</h3>
+                <p>LLM 应用的工程化框架</p>
+            </a>
+            <a href="context-engineering.html" class="article-card">
+                <div class="article-icon">📚</div>
+                <h3>Context Engineering</h3>
+                <p>上下文管理的设计原则</p>
+            </a>
+            <a href="prompt-engineering.html" class="article-card">
+                <div class="article-icon">✍️</div>
+                <h3>Prompt Engineering</h3>
+                <p>提示词工程的系统方法</p>
+            </a>
+            <a href="loop-engineering.html" class="article-card">
+                <div class="article-icon">🔄</div>
+                <h3>Loop Engineering</h3>
+                <p>循环工程的迭代方法论</p>
+            </a>
         </div>
     </main>
-    <!-- 页脚：版权与外链 -->
-    <footer>
-        <p>© 2026 · Built with ❤️ and <a href="https://pages.github.com" target="_blank" rel="noopener">GitHub Pages</a></p>
+
+    <footer class="site-footer">
+        <p>© 2026 · Built with ❤️ by kipozannaki</p>
     </footer>
 </body>
 </html>
