@@ -26,20 +26,18 @@
 
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">拆解 Harness</a> · <a href="#shizhan">实战避坑</a> · <a href="#jueze">要不要上</a> · <a href="#jieyu">结语</a></p>
 
-            <!-- ========== 一、引言 ========== -->
             <h2 id="intro">一、引言：为什么"裸奔"的 Agent 会要命</h2>
             <p>特种兵光有枪和目标还不够。没有装备手册、没有战地规则、没有指挥部随时喊停——照样会打偏、会走火、会把自己人炸了。<strong>这就是"裸奔"的 Agent：有模型、有工具，却没有 Harness</strong>。</p>
             <p>不信邪？Anthropic 自己做过一组对照实验：同一个模型 Opus 4.5，同一句提示"做一个 2D 复古游戏编辑器"。不套任何脚手架、让模型单跑：20 分钟，花 9 美元，产出勉强能打开但基本没法真正玩。换成一套完整的 Harness——拆成规划者、生成者、评估者三个角色分工协作：跑了 6 个小时，花了 200 美元，最后交出来的是一个功能完整、真能玩的产品。<strong>同一个大脑，穿没穿"盔甲"，产出是天差地别的两个物种</strong>。</p>
             <p>这组数字戳破了一个常见误解：很多人觉得 Agent 效果不好是模型不够聪明，加把劲优化 Prompt 就行。但上面这个实验里，模型完全没变——变的是<strong>模型运行所在的那套系统</strong>。<strong>Harness Engineering 干的就是这件事：设计模型工作时所处的整个外部环境——上下文怎么喂、工具接口怎么设计、结果由谁验收、权限边界划在哪、出了错怎么兜底。</strong></p>
             <blockquote>💡 <strong>模型的能力是天花板，Harness 决定的是这个天花板底下，你能不能稳定地摸到它。</strong></blockquote>
 
-            <!-- ========== 二、坐标 ========== -->
             <h2 id="zuobiao">二、Harness Engineering 在工程体系里的坐标</h2>
             <p>先把"裸跑"和"全副武装"之间的差距摆在台面上：</p>
             <table>
                 <thead>
                     <tr>
-                        <th></th>
+                        <th aria-hidden="true">　</th>
                         <th>裸跑（无 Harness）</th>
                         <th>基础兜底</th>
                         <th>完整 Harness（规划 + 生成 + 评估）</th>
@@ -82,7 +80,6 @@
                 <li><strong>× Loop Engineering</strong>　一次搭好的 Harness 大概率是错的——好的做法是一次只拆一个组件、跑一轮、看少了它任务还成不成。这个"改一个变量、测一轮、留下有用的"的过程，就是 Loop Engineering 在 Harness 场景下的样子。</li>
             </ul>
 
-            <!-- ========== 三、拆解 Harness ========== -->
             <h2 id="zujian">三、拆开一副称手的 Harness，里面装的是什么</h2>
             <p>把"Harness"这个词拆开看，其实就是五块拼图：</p>
             <table>
@@ -131,7 +128,6 @@
 }</code></pre>
             <p>不用靠"猜项目做到哪了"，直接看这份清单里还剩几条 <code>failing</code>。</p>
 
-            <!-- ========== 四、实战避坑 ========== -->
             <h2 id="shizhan">四、实战避坑：两个"血泪翻车现场"</h2>
 
             <h3>坑一：让模型自己判自己的作业，它是个"乐观诈骗犯"</h3>
@@ -152,7 +148,6 @@
             <p>每次升级底层模型，别急着照抄旧 Harness，逐个组件拿掉，看少了它任务还完不完得成。能拿掉的果断拿掉——这是 Loop Engineering 那套"改一个变量、跑一轮、看结果"的方法论，用在 Harness 维护上。</p>
             <blockquote>💡 <strong>Harness 不是搭好就一劳永逸的——它得跟着模型一起"发育"，你今天的解药，可能是明天的镣铐。</strong></blockquote>
 
-            <!-- ========== 五、要不要上 ========== -->
             <h2 id="jueze">五、进阶：怎么判断这个任务要不要上 Harness</h2>
             <p>不是所有任务都值得套完整的三角色 Harness——Anthropic 自己的设计原则是：<strong>找最简单能跑通的方案，只有真正需要时才增加复杂度</strong>。一个粗糙但够用的判断依据：</p>
             <ul>
@@ -161,7 +156,6 @@
             </ul>
             <p>那组 9 美元 vs 200 美元的数字放在这里正合适：<strong>如果你要的是一次性草稿，9 美元的方案完全够用；如果你要的是能交付的产品，200 美元买的不是"更贵"，是"能用"和"不能用"之间的那道坎</strong>。</p>
 
-            <!-- ========== 六、结语 ========== -->
             <h2 id="jieyu">六、结语：Harness 才是 Agent 的真骨架</h2>
             <p><strong>给小白的话</strong>：下次用一个 AI 产品觉得"这个 AI 好靠谱"，靠谱的多半不只是模型聪明，背后大概率有一整套你看不见的 Harness 在替它兜底。这个词听着唬人，说白了就是"给 AI 配的工作规范和安全带"。</p>
             <p><strong>给开发者的话</strong>：别只盯着 Prompt 反复调优——找一个你正在跑的 Agent，拆开看看它有哪一步是靠"祈祷模型别出错"硬撑着的，那一步就是你该补 Harness 的地方。上下文怎么管、谁来验收、权限边界在哪、状态怎么交接，这四个问题答不上来，说明这个 Agent 还是在"裸奔"。</p>
@@ -169,7 +163,6 @@
 
             <p class="refs"><strong>参考资料</strong>：Anthropic 工程博客《Effective harnesses for long-running agents》《Harness design for long-running application development》</p>
 
-            <!-- 跨文章导航：上一站 Skill + 下一站 Context Engineering，引导读者按主题顺序阅读 -->
             <nav class="article-nav">
                 <a href="skill.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -191,7 +184,6 @@
         </div>
     </article>
 
-    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
