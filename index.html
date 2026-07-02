@@ -1,14 +1,16 @@
 <!DOCTYPE html>
-<!-- 首页：6 篇文章列表导航页。复用 style.css 共享样式 -->
+<!-- 首页：双列布局 + 5 个 section + 暗色/阅读模式切换
+     参考 https://bobcgn.github.io/quartz-myblogs/ 的极简索引风格 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>kipozannaki · AI 主题内容站</title>
-    <meta name="description" content="关于 Agent、Skill、Harness/Context/Prompt/Loop Engineering 的 LLM 工程实践">
+    <meta name="description" content="LLM 应用工程体系的实战笔记与沉淀">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- 站点 Header：Logo + 6 篇文章导航 + 暗色/阅读模式切换按钮 -->
     <header class="site-header">
         <a href="index.html" class="logo">📚 kipozannaki</a>
         <nav class="site-nav">
@@ -19,50 +21,167 @@
             <a href="prompt-engineering.html">Prompt Engineering</a>
             <a href="loop-engineering.html">Loop Engineering</a>
         </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
     </header>
 
-    <section class="hero">
+    <!-- Hero 轻量版：渐变小标题 -->
+    <section class="hero-compact">
         <h1>AI 主题内容站</h1>
-        <p>关于 Agent、Skill、Engineering 实践的探索与沉淀</p>
+        <p>LLM 应用工程体系的实战笔记与沉淀</p>
     </section>
 
-    <main class="container">
-        <div class="articles-grid">
-            <a href="agent.html" class="article-card">
-                <div class="article-icon">🧠</div>
-                <h3>Agent</h3>
-                <p>智能体架构与自主决策</p>
-            </a>
-            <a href="skill.html" class="article-card">
-                <div class="article-icon">🛠️</div>
-                <h3>Skill</h3>
-                <p>AI 工具能力的最小单元</p>
-            </a>
-            <a href="harness-engineering.html" class="article-card">
-                <div class="article-icon">🔧</div>
-                <h3>Harness Engineering</h3>
-                <p>LLM 应用的工程化框架</p>
-            </a>
-            <a href="context-engineering.html" class="article-card">
-                <div class="article-icon">📚</div>
-                <h3>Context Engineering</h3>
-                <p>上下文管理的设计原则</p>
-            </a>
-            <a href="prompt-engineering.html" class="article-card">
-                <div class="article-icon">✍️</div>
-                <h3>Prompt Engineering</h3>
-                <p>提示词工程的系统方法</p>
-            </a>
-            <a href="loop-engineering.html" class="article-card">
-                <div class="article-icon">🔄</div>
-                <h3>Loop Engineering</h3>
-                <p>循环工程的迭代方法论</p>
-            </a>
-        </div>
-    </main>
+    <!-- 双列布局：左侧 sticky 索引 + 右侧主内容 -->
+    <div class="site-layout">
+        <aside class="sidebar">
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 站内文章</h3>
+                <a href="agent.html" class="sidebar-item"><span class="icon">🧠</span><span>Agent</span></a>
+                <a href="skill.html" class="sidebar-item"><span class="icon">🛠️</span><span>Skill</span></a>
+                <a href="harness-engineering.html" class="sidebar-item"><span class="icon">🔧</span><span>Harness Engineering</span></a>
+                <a href="context-engineering.html" class="sidebar-item"><span class="icon">📚</span><span>Context Engineering</span></a>
+                <a href="prompt-engineering.html" class="sidebar-item"><span class="icon">✍️</span><span>Prompt Engineering</span></a>
+                <a href="loop-engineering.html" class="sidebar-item"><span class="icon">🔄</span><span>Loop Engineering</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">🔗 站内导航</h3>
+                <a href="#about-site" class="sidebar-item"><span class="icon">🏠</span><span>关于本站</span></a>
+                <a href="#about-me" class="sidebar-item"><span class="icon">👋</span><span>关于我</span></a>
+                <a href="#tech-focus" class="sidebar-item"><span class="icon">🎯</span><span>技术关注点</span></a>
+                <a href="#subscribe" class="sidebar-item"><span class="icon">🔔</span><span>订阅更新</span></a>
+                <a href="#feedback" class="sidebar-item"><span class="icon">💬</span><span>互动反馈</span></a>
+            </div>
+        </aside>
 
+        <main>
+            <!-- 文章卡片网格：6 篇文章入口 -->
+            <div class="articles-grid">
+                <a href="agent.html" class="article-card">
+                    <div class="article-icon">🧠</div>
+                    <h3>Agent</h3>
+                    <p>智能体架构与自主决策</p>
+                </a>
+                <a href="skill.html" class="article-card">
+                    <div class="article-icon">🛠️</div>
+                    <h3>Skill</h3>
+                    <p>AI 工具能力的最小单元</p>
+                </a>
+                <a href="harness-engineering.html" class="article-card">
+                    <div class="article-icon">🔧</div>
+                    <h3>Harness Engineering</h3>
+                    <p>LLM 应用的工程化框架</p>
+                </a>
+                <a href="context-engineering.html" class="article-card">
+                    <div class="article-icon">📚</div>
+                    <h3>Context Engineering</h3>
+                    <p>上下文管理的设计原则</p>
+                </a>
+                <a href="prompt-engineering.html" class="article-card">
+                    <div class="article-icon">✍️</div>
+                    <h3>Prompt Engineering</h3>
+                    <p>提示词工程的系统方法</p>
+                </a>
+                <a href="loop-engineering.html" class="article-card">
+                    <div class="article-icon">🔄</div>
+                    <h3>Loop Engineering</h3>
+                    <p>循环工程的迭代方法论</p>
+                </a>
+            </div>
+
+            <!-- Section 1: 关于本站 -->
+            <section id="about-site" class="section">
+                <h2>🏠 关于本站</h2>
+                <p>这是我的 AI 工程主题站，专门写 LLM 应用工程体系。每一篇都是“读 + 写 + 改”的实战笔记——不是把官方文档换个皮，是“我跑一遍踩了哪些坑、最后怎么收的口”。</p>
+                <p>目标读者：想用 LLM 做点真东西、不想被 PPT 词条忽悠的开发者；刚开始上路不知道怎么做的新手小白。</p>
+            </section>
+
+            <!-- Section 2: 关于我 -->
+            <section id="about-me" class="section">
+                <h2>👋 关于我</h2>
+                <p>大家好，我是 kipozannaki。一名对 AI 工程化和实用小工具着迷的开发者。习惯想到一个场景就动手做出来，喜欢把重复劳动脚本化、把零碎想法沉淀成可用的工具。</p>
+            </section>
+
+            <!-- Section 3: 技术关注点 -->
+            <section id="tech-focus" class="section">
+                <h2>🎯 技术关注点</h2>
+                <ul>
+                    <li><strong>LLM 工程化</strong>：Agent / Skill / Harness / Context / Prompt / Loop Engineering 完整链路，从“调包”到“能稳定跑”</li>
+                    <li><strong>深度学习实战</strong>：CNN 视觉任务，模型设计 + 训练调优</li>
+                    <li><strong>端到端小工具</strong>：从想法到上线全流程自己扛（CertRun、视频增强、数据备份）</li>
+                    <li><strong>AI + 实际场景</strong>：把模型能力塞进真实业务里，而不是只停在 notebook</li>
+                </ul>
+            </section>
+
+            <!-- Section 4: 订阅更新（通用兑底文案） -->
+            <section id="subscribe" class="section">
+                <h2>🔔 订阅更新</h2>
+                <div class="cta-card">
+                    <span class="cta-icon">⭐</span>
+                    <div class="cta-text">
+                        <strong>GitHub Watch</strong>
+                        <span>点 <a href="https://github.com/kipozannaki" target="_blank" rel="noopener">Watch → Custom → Releases</a> 勾选仓库，每次内容更新收到铃铛通知</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 5: 互动反馈（通用兑底文案） -->
+            <section id="feedback" class="section">
+                <h2>💬 互动反馈</h2>
+                <p>发现文章错误、有新功能建议，或者想讨论具体实现，<a href="https://github.com/kipozannaki/kipozannaki.github.io/issues" target="_blank" rel="noopener">提 Issue</a> 追踪最方便：版本可回溯、讨论可沉淀。</p>
+                <div class="cta-card">
+                    <span class="cta-icon">🐙</span>
+                    <div class="cta-text">
+                        <strong>GitHub Issues</strong>
+                        <span>页面底部 Footer 也有直达链接</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 站点页脚 -->
     <footer class="site-footer">
-        <p>© 2026 · Built with ❤️ by kipozannaki</p>
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
     </footer>
+
+    <!-- 暗色 / 阅读模式切换逻辑
+         - localStorage 记住用户偏好，刷新页面后保持
+         - 用 data-theme + body.class 切换主题
+         - 按钮激活态用 .active 标记 -->
+    <script>
+        (function() {
+            // 读取本地偏好，无则用系统偏好
+            const savedTheme = localStorage.getItem('theme');
+            const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (sysDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            if (localStorage.getItem('reading') === '1') document.body.classList.add('reading-mode');
+
+            // 按钮初始化状态
+            const themeBtn = document.getElementById('theme-toggle');
+            const readBtn = document.getElementById('reading-toggle');
+            if (theme === 'dark') themeBtn.classList.add('active');
+            if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+
+            // 暗色模式切换
+            themeBtn.addEventListener('click', () => {
+                const cur = document.documentElement.getAttribute('data-theme');
+                const next = cur === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                themeBtn.classList.toggle('active');
+                localStorage.setItem('theme', next);
+            });
+
+            // 阅读模式切换
+            readBtn.addEventListener('click', () => {
+                document.body.classList.toggle('reading-mode');
+                const on = document.body.classList.contains('reading-mode');
+                readBtn.classList.toggle('active');
+                localStorage.setItem('reading', on ? '1' : '0');
+            });
+        })();
+    </script>
 </body>
 </html>
