@@ -27,9 +27,40 @@
             <p class="meta">智能体架构与自主决策</p>
         </header>
         <div class="article-body">
-            <div class="placeholder">
-                <p>📝 内容待补充</p>
-            </div>
+            <!-- 正文：Agent 入门与核心架构 -->
+            <h2>什么是 Agent</h2>
+            <p>Agent（智能体）是基于 LLM 构建的<strong>自主决策系统</strong>。与单次 LLM 调用或固定 Chain 不同，Agent 能根据目标动态规划步骤、调用工具、观察结果，并循环迭代直到完成。</p>
+            <blockquote>核心特征：LLM 充当推理引擎（Reasoning Engine），而非单纯的文本生成器。</blockquote>
+
+            <h2>核心组件</h2>
+            <ul>
+                <li><strong>感知（Perception）</strong>：解析用户输入与当前环境状态</li>
+                <li><strong>规划（Planning）</strong>：把目标拆解为可执行步骤序列</li>
+                <li><strong>记忆（Memory）</strong>：短期上下文 + 长期知识库（向量存储）</li>
+                <li><strong>工具使用（Tool Use）</strong>：调用外部能力（搜索、代码、API）</li>
+                <li><strong>行动（Action）</strong>：执行步骤并把结果回写到记忆</li>
+            </ul>
+
+            <h2>典型模式：ReAct</h2>
+            <p>ReAct（Reason + Act）是最经典的 Agent 循环范式：</p>
+            <pre><code>while not task_done:
+    thought  = llm.think(context, history)
+    action   = llm.select_tool(thought)
+    result   = execute(action)
+    context  = context + result</code></pre>
+            <p>每个循环包含 4 步：<code>思考 → 选择工具 → 执行 → 观察</code>。LLM 决定何时终止循环、是否需要纠正方向。</p>
+
+            <h2>实战注意事项</h2>
+            <ol>
+                <li><strong>工具描述决定上限</strong>：工具的 <code>name</code>、<code>description</code>、<code>parameters schema</code> 是 LLM 决策的唯一依据，描述不清则 Agent 调用混乱</li>
+                <li><strong>上下文是稀缺资源</strong>：每次循环都累积 token，需要设计记忆压缩/总结机制</li>
+                <li><strong>必须设 max_steps</strong>：避免无限循环或成本爆炸</li>
+                <li><strong>错误恢复</strong>：工具失败时给 LLM 重试或换路径的机会，而不是直接终止</li>
+            </ol>
+
+            <h2>下一篇</h2>
+            <p>Agent 需要"会做事"才能完成目标，而 <strong>Skill</strong> 正是把"会做事"封装为可复用单元的最小抽象。<a href="skill.html">下一篇：Skill →</a></p>
+
             <a href="index.html" class="back-link">← 返回首页</a>
         </div>
     </article>
