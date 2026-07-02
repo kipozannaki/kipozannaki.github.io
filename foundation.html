@@ -67,38 +67,44 @@
     </footer>
 
     <script>
-        (function() {
-            const savedTheme = localStorage.getItem('theme');
-            const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const theme = savedTheme || (sysDark ? 'dark' : 'light');
-            document.documentElement.setAttribute('data-theme', theme);
-            if (localStorage.getItem('reading') === '1') document.body.classList.add('reading-mode');
-            if (localStorage.getItem('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
+    (function() {
+        // localStorage 异常保护：隐私模式 / 无痕模式 / 配额满时 setItem 可能抛错
+        // 用 safeSet/safeGet 包装后，单点失败不会击穿整个 IIFE，
+        // 主题/阅读模式/侧边栏的开关功能不会因此完全失灵
+        const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级：不阻塞当前页交互 */ } };
 
-            const themeBtn = document.getElementById('theme-toggle');
-            const readBtn = document.getElementById('reading-toggle');
-            const sideBtn = document.getElementById('sidebar-toggle');
-            if (theme === 'dark') themeBtn.classList.add('active');
-            if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+        const savedTheme = safeGet('theme');
+        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (sysDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        if (safeGet('reading') === '1') document.body.classList.add('reading-mode');
+        if (safeGet('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
 
-            themeBtn.addEventListener('click', () => {
-                const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-                document.documentElement.setAttribute('data-theme', next);
-                themeBtn.classList.toggle('active');
-                localStorage.setItem('theme', next);
-            });
-            readBtn.addEventListener('click', () => {
-                document.body.classList.toggle('reading-mode');
-                const on = document.body.classList.contains('reading-mode');
-                readBtn.classList.toggle('active');
-                localStorage.setItem('reading', on ? '1' : '0');
-            });
-            sideBtn.addEventListener('click', () => {
-                document.body.classList.toggle('sidebar-open');
-                const on = document.body.classList.contains('sidebar-open');
-                localStorage.setItem('sidebarOpen', on ? '1' : '0');
-            });
-        })();
+        const themeBtn = document.getElementById('theme-toggle');
+        const readBtn = document.getElementById('reading-toggle');
+        const sideBtn = document.getElementById('sidebar-toggle');
+        if (theme === 'dark') themeBtn.classList.add('active');
+        if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+
+        themeBtn.addEventListener('click', function() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            themeBtn.classList.toggle('active');
+            safeSet('theme', next);
+        });
+        readBtn.addEventListener('click', function() {
+            document.body.classList.toggle('reading-mode');
+            const on = document.body.classList.contains('reading-mode');
+            readBtn.classList.toggle('active');
+            safeSet('reading', on ? '1' : '0');
+        });
+        sideBtn.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-open');
+            const on = document.body.classList.contains('sidebar-open');
+            safeSet('sidebarOpen', on ? '1' : '0');
+        });
+    })();
     </script>
 </body>
 </html>

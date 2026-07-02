@@ -75,16 +75,24 @@ a:hover { color: var(--primary-dark); }
 .article-body code { font-family: 'Fira Code', 'Consolas', monospace; }
 .article-body p code, .article-body li code { background: var(--bg); color: #c7254e; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
 .article-body blockquote { margin: 16px 0; padding: 12px 20px; border-left: 4px solid var(--primary); background: var(--bg); color: var(--text-light); border-radius: 0 8px 8px 0; }
-/* 表格：移动端友好的横向滚动 + 内容允许换行
-   - 用 display:block 让 table 自身成为滚动容器，兼容所有浏览器
-   - thead/tbody 仍 display:table 保持列对齐
-   - 取消 td 的 nowrap，让中文长句能换行，避免单列撑爆
-   - .table-scroll 由 JS 自动注入，兼容不愿改 HTML 的旧文章 */
-.article-body table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95rem; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* 表格：外层 .table-scroll 负责横向滚动，table 保持 table 布局让 thead/tbody 共享列宽
+   - 旧方案 table{display:block} + thead/tbody{display:table} 会导致 thead 和 tbody
+     各自独立计算列宽，表头和单元格完全错位
+   - 新方案 table 用 display:table，浏览器自动根据 thead+tbody 全部内容
+     统一计算列宽，保证对齐；横向滚动交给 .table-scroll 容器
+   - 取消 td 的 nowrap，让中文长句能换行，避免单列撑爆 */
+.article-body table {
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.95rem;
+    display: table;
+    width: 100%;
+}
 .article-body th, .article-body td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; line-height: 1.6; word-break: break-word; overflow-wrap: anywhere; }
-.article-body table thead, .article-body table tbody { display: table; width: 100%; }
 .article-body th { background: var(--bg); font-weight: 600; color: var(--text); }
 .article-body tbody tr:nth-child(even) { background: #fafafa; }
+/* 暗色模式下覆盖：#2a3548 比 --card-bg(#1f2937) 稍亮，形成与 light 模式对称的反向条纹 */
+[data-theme="dark"] .article-body tbody tr:nth-child(even) { background: #2a3548; }
 /* 表格空白首列（如 <th aria-hidden="true">）的兜底样式：
    - 透明边框 + 透明背景，视觉上不渲染方框
    - 极小 min-width，保留列结构不破坏对齐
