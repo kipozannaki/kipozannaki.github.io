@@ -325,3 +325,32 @@ a:hover { color: var(--primary-dark); }
     color: var(--text-light);
     border-radius: 0 8px 8px 0;
 }
+
+/* ============================================
+   文章正文里的表格（对比表 / 数据表）
+   - border-collapse: collapse 让单元格共享边框，不双线
+   - 表头用浅灰底 + 加粗，建立视觉锚点
+   - 偶数行淡背景，扫读时眼睛更容易横着对齐
+   ============================================ */
+.article-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.95rem;
+}
+.article-body th,
+.article-body td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.6;
+}
+.article-body th {
+    background: var(--bg);
+    font-weight: 600;
+    color: var(--text);
+}
+.article-body tbody tr:nth-child(even) {
+    background: #fafafa;
+}
