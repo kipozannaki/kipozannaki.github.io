@@ -170,6 +170,45 @@ a:hover { color: var(--primary-dark); }
 .back-link:hover { background: var(--primary); color: white; }
 
 /* ============================================
+   跨文章导航：渐变卡片，醒目引导读者点"下一站"
+   - 复用主渐变色，与 Hero/article-header 视觉呼应
+   - flex 三段式：标签 + 标题 + 箭头
+   ============================================ */
+.next-article {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 32px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: var(--radius);
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: var(--shadow);
+}
+.next-article:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-hover);
+    color: white;
+}
+.next-article .next-label {
+    font-size: 0.7rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+}
+.next-article .next-title {
+    flex: 1;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+.next-article .next-arrow {
+    font-size: 1.5rem;
+    font-weight: 300;
+}
+
+/* ============================================
    页脚
    ============================================ */
 .site-footer {
