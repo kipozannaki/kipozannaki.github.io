@@ -26,19 +26,17 @@
 
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">拆解</a> · <a href="#shizhan">实战避坑</a> · <a href="#yusuan">预算心法</a> · <a href="#jieyu">结语</a></p>
 
-            <!-- ========== 一、引言 ========== -->
             <h2 id="intro">一、引言：为什么"塞得越多"反而越蠢</h2>
             <p>很多人对上下文窗口有个朴素的误解：<strong>反正窗口够大，多塞点信息总没坏处，让模型自己挑重点就是了</strong>。事实恰恰相反——学界给这个现象起了个名字，叫"<strong>Lost in the Middle</strong>"：把一份很长的资料塞进上下文，模型对开头和结尾的内容处理得明显更好，<strong>埋在中间的信息，哪怕完全相关，也容易被直接漏看</strong>。还有研究把这个现象进一步归纳成"<strong>Context Rot</strong>"（上下文腐化）——输入的 token 越长，模型的表现越会打折扣，不是因为信息不相关，纯粹是"看"得越多、"看"得越粗。</p>
             <p>这个坑我们在 agent.html 里已经真刀真枪踩过一次了：工具返回的原始数据不加裁剪地全塞进上下文，一次请求的 token 量和延迟直接指数级暴涨。<strong>Context Engineering 要解决的问题比那次踩坑更进一步</strong>——不只是"别塞太多"，而是要系统性地回答：<strong>推理这一刻，模型的工作台上到底该摆哪些东西</strong>？这也是 Anthropic 自己给这门学问下的定义式问题：什么样的上下文配置，最可能让模型产出你想要的行为。</p>
             <blockquote>💡 <strong>上下文不是仓库，是工作台——这句话我们在 agent.html 里说过一次，这篇文章讲的就是怎么把这句话落成一套方法。</strong></blockquote>
 
-            <!-- ========== 二、坐标 ========== -->
             <h2 id="zuobiao">二、Context Engineering 在工程体系里的坐标</h2>
             <p>先分清楚 Context Engineering 和 Prompt Engineering 差在哪——这是最容易被混为一谈的一对概念：</p>
             <table>
                 <thead>
                     <tr>
-                        <th></th>
+                        <th aria-hidden="true">　</th>
                         <th>Prompt Engineering</th>
                         <th>Context Engineering</th>
                     </tr>
@@ -75,7 +73,6 @@
                 <li><strong>× Loop Engineering</strong>　上下文该留多少、该在哪个节点摘要，没有放之四海皆准的公式，只能靠"改一版策略、跑一轮、看指标"逐步逼近——这仍然是 Loop Engineering 的活。</li>
             </ul>
 
-            <!-- ========== 三、拆解 ========== -->
             <h2 id="zujian">三、拆开看：Context Engineering 都在管什么</h2>
             <table>
                 <thead>
@@ -115,7 +112,6 @@
             </table>
             <p>把这张表和前两篇对照着看会发现一件事：<strong>这五项技巧没有一项是新概念，全都是本站前两篇文章里已经具体出现过的做法——Context Engineering 做的事，是把这些散落的招式，收进同一套方法论里</strong>。</p>
 
-            <!-- ========== 四、实战避坑 ========== -->
             <h2 id="shizhan">四、实战避坑：两个"血泪翻车现场"</h2>
 
             <h3>坑一：关键规则埋在中间，模型直接"看不见"</h3>
@@ -131,17 +127,15 @@
             <p><strong>翻车现场还原</strong>：</p>
             <p>一个 Agent 挂了几十个工具，每个工具的 Schema 描述都占不少 token。模型经常调错工具，或者干脆在几个相似工具之间反复横跳——不是模型笨，是<strong>候选项太多，判断负担太重</strong>。</p>
             <p><strong>根因剖析</strong>：</p>
-            <p>每加一个工具的 Schema，都是实打实占用上下文预算的成本；工具越多，模型要在候选项之间做区分的负担越重，选择准确率反而下降。</p>
+            <p>每加一个工具的 Schema，都是实实占用上下文预算的成本；工具越多，模型要在候选项之间做区分的负担越重，选择准确率反而下降。</p>
             <p><strong>解决方案</strong>：</p>
             <p>参考"常驻 + 按需发现"的分层——最常用的 3~5 个工具常驻上下文，其余的通过动态检索机制在真正需要时才拉进来。这和 Skill 的三层加载是同一个原则的两种实现：都是<strong>先给一个薄薄的目录，命中了才展开细节</strong>。</p>
             <blockquote>💡 <strong>工具不是越多越强大，货架堆太满，顾客反而找不到东西。</strong></blockquote>
 
-            <!-- ========== 五、预算心法 ========== -->
             <h2 id="yusuan">五、进阶：一个简单的"上下文预算"心法</h2>
             <p>每次想往上下文里加一样东西——一段文档、一个工具、一轮历史对话——先问自己一句：<strong>模型这一步真的需要看到它吗？</strong>而不是本能地觉得"信息多给点总没错"。</p>
             <p>这句话听着简单，但和大多数人的直觉是反着来的。多数人对上下文的态度是"覆盖面优先"——生怕漏了什么，宁可多塞。但前面两个坑已经说明了：<strong>塞得全，不等于塞得对</strong>。上下文预算和金钱预算是一个道理——不是有多少花多少，是先想清楚这一步到底要买什么。</p>
 
-            <!-- ========== 六、结语 ========== -->
             <h2 id="jieyu">六、结语：上下文管理才是 Agent 的隐藏难度</h2>
             <p><strong>给小白的话</strong>：下次发现某个 AI 产品"聊着聊着开始变傻"，大概率不是模型突然变笨了，是它的工作台被堆得太满，重要的东西被埋没了。</p>
             <p><strong>给开发者的话</strong>：别把上下文窗口当成"越大越安全"的免费仓库。写 Agent 之前先问自己：这一步，模型的工作台上真正需要哪几样东西？答不上来，说明这个 Agent 的上下文管理还停留在"能跑就行"的阶段。</p>
@@ -149,7 +143,6 @@
 
             <p class="refs"><strong>参考资料</strong>：Anthropic 工程博客《Effective context engineering for AI agents》；Liu et al.《Lost in the Middle: How Language Models Use Long Contexts》；Chroma 技术报告《Context Rot》</p>
 
-            <!-- 跨文章导航：上一站 Harness Engineering / 下一站 Prompt Engineering -->
             <nav class="article-nav">
                 <a href="harness-engineering.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -171,7 +164,6 @@
         </div>
     </article>
 
-    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
