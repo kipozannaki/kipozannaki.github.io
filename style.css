@@ -93,20 +93,9 @@ a:hover { color: var(--primary-dark); }
 .article-body tbody tr:nth-child(even) { background: #fafafa; }
 /* 暗色模式下覆盖：#2a3548 比 --card-bg(#1f2937) 稍亮，形成与 light 模式对称的反向条纹 */
 [data-theme="dark"] .article-body tbody tr:nth-child(even) { background: #2a3548; }
-/* 表格空白首列（如 <th aria-hidden="true">）的兜底样式：
-   - 透明边框 + 透明背景，视觉上不渲染方框
-   - padding 与正常 th 一致（10px 14px），让占位列保持合理宽度
-   - 关键：padding 不能收太紧，否则第一列实际表头会紧贴表格左边界，视觉上"缺失空格" */
-/* 关键点：不要带 :empty 后缀。
-   6 篇文章的占位 th 写的是 <th aria-hidden="true">　</th>，
-   全角空格让 :empty 永远命中不到，导致整条规则失效，空白首列照样渲染边框 */
-.article-body table th:empty,
-.article-body table th[aria-hidden="true"] {
-    background: transparent;
-    border-color: transparent;
-    padding: 10px 14px;
-    min-width: auto;
-}
+/* 占位 th（如 <th aria-hidden="true">　</th>）与正常 th 一致：
+   保留背景、边框、padding，只是内容为全角空格不可见。
+   不做透明处理，让占位列与同行其他格视觉一致。 */
 /* JS 注入的滚动容器：进一步增强老浏览器/某些 webview 的滚动体验 */
 .table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0; }
 .table-scroll > table { margin: 0; }
