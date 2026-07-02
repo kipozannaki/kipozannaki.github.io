@@ -85,6 +85,17 @@ a:hover { color: var(--primary-dark); }
 .article-body table thead, .article-body table tbody { display: table; width: 100%; }
 .article-body th { background: var(--bg); font-weight: 600; color: var(--text); }
 .article-body tbody tr:nth-child(even) { background: #fafafa; }
+/* 表格空白首列（如 <th aria-hidden="true">）的兜底样式：
+   - 透明边框 + 透明背景，视觉上不渲染方框
+   - 极小 min-width，保留列结构不破坏对齐
+   - padding 收紧到 2px，避免单元格在窄屏上"鼓起" */
+.article-body table th:empty,
+.article-body table th[aria-hidden="true"]:empty {
+    background: transparent;
+    border-color: transparent;
+    padding: 0 2px;
+    min-width: 4px;
+}
 /* JS 注入的滚动容器：进一步增强老浏览器/某些 webview 的滚动体验 */
 .table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0; }
 .table-scroll > table { margin: 0; }
@@ -227,41 +238,3 @@ body.sidebar-open .sidebar-toggle { transform: rotate(180deg); }
     border-radius: 50%;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 26px;
-}
-.topic-info { flex: 1; min-width: 0; }
-.topic-info h3 {
-    font-size: 1.2rem;
-    margin: 0 0 8px;
-    color: var(--text);
-}
-.topic-info p {
-    color: var(--text-light);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin: 0 0 12px;
-}
-.topic-cta {
-    display: inline-block;
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-.empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    background: var(--bg);
-    color: var(--text-light);
-}
-.empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
-.empty-state .empty-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 8px;
-}
-.empty-state .empty-desc { font-size: 0.9rem; line-height: 1.7; }
-.empty-state a { color: var(--primary); font-weight: 500; }
