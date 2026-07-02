@@ -19,7 +19,7 @@
 
     <article class="article-page">
         <header class="article-header">
-            <h1>� Loop Engineering 工业级落地</h1>
+            <h1>🔄 Loop Engineering 工业级落地</h1>
             <p class="meta">从"凭感觉一把梭"到"有章可循的迭代闭环" · 双栖科普</p>
         </header>
         <div class="article-body">
@@ -30,7 +30,7 @@
             <h2 id="intro">一、引言：为什么"改一次就交差"总是不够</h2>
             <p>这是本系列最后一篇，也是把前面五篇串起来的那根线。如果说 Agent 是手脚、Skill 是专业知识包、Harness 是盔甲、Context 是工作台、Prompt 是说明书——<strong>Loop Engineering 管的是：干完一次活之后，怎么知道这活到底干得好不好，要不要重干，重干的时候该往哪使劲</strong>。</p>
             <p>回头看前面四篇，"改一个变量、跑一轮、看数据、留下有用的"这个动作其实已经反复出现过：agent.html 里的消融实验、harness-engineering.html 里换模型后的拆解测试、context-engineering.html 里上下文策略的逐步调优、prompt-engineering.html 里 Prompt 的版本迭代——<strong>这些说的都是同一件事，只是套在了不同的壳子上</strong>。Loop Engineering 要做的，是把这件事从"每次凭感觉重新发明一遍"，变成一套<strong>有明确检查维度、有终止条件、有反馈机制的可复现流程</strong>。</p>
-            <blockquote>💡 <strong>前面五篇讲的是"怎么让 AI 干活"，这一篇讲的是"怎么知道 AI 干得好不好，以及接下来该怎么办"。</strong></blockquote>
+            <blockquote>💡 <strong>前面五篇讲的是"怎么让 AI 干活"，这一篇讲的是"怎么知道 AI 干得好不好，以及接下来该怎么办。</strong></blockquote>
 
             <!-- ========== 二、坐标 ========== -->
             <h2 id="zuobiao">二、Loop Engineering 在工程体系里的坐标</h2>
@@ -147,7 +147,7 @@
             <p>"多检查几遍"是个没有边界的指令。没有清晰的维度划分和终止条件，循环要么提前草草收场，要么陷入原地打转。</p>
             <p><strong>解决方案</strong>：</p>
             <p>像 RELOO 那样，把"审查"拆成几个互不重叠的固定维度，每轮只聚焦一个；终止条件写清楚——连续一轮没有新发现，或者所有维度都跑完了，就是停止信号。</p>
-            <blockquote>� <strong>没有终止条件的循环不是迭代，是原地打转。</strong></blockquote>
+            <blockquote>💡 <strong>没有终止条件的循环不是迭代，是原地打转。</strong></blockquote>
 
             <h3>坑二：只顾"改"，不顾"沉淀"——同一个坑反复踩</h3>
             <p><strong>翻车现场还原</strong>：</p>
@@ -196,6 +196,19 @@
             <a href="application.html" class="back-link">← 返回 Application 专题</a>
         </div>
     </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
 
     <footer class="site-footer">
         <p>© 2026 · kipozannaki</p>
