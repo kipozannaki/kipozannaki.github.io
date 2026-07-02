@@ -75,10 +75,19 @@ a:hover { color: var(--primary-dark); }
 .article-body code { font-family: 'Fira Code', 'Consolas', monospace; }
 .article-body p code, .article-body li code { background: var(--bg); color: #c7254e; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
 .article-body blockquote { margin: 16px 0; padding: 12px 20px; border-left: 4px solid var(--primary); background: var(--bg); color: var(--text-light); border-radius: 0 8px 8px 0; }
-.article-body table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95rem; }
-.article-body th, .article-body td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; line-height: 1.6; }
+/* 表格：移动端友好的横向滚动 + 内容允许换行
+   - 用 display:block 让 table 自身成为滚动容器，兼容所有浏览器
+   - thead/tbody 仍 display:table 保持列对齐
+   - 取消 td 的 nowrap，让中文长句能换行，避免单列撑爆
+   - .table-scroll 由 JS 自动注入，兼容不愿改 HTML 的旧文章 */
+.article-body table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95rem; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.article-body th, .article-body td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; line-height: 1.6; word-break: break-word; overflow-wrap: anywhere; }
+.article-body table thead, .article-body table tbody { display: table; width: 100%; }
 .article-body th { background: var(--bg); font-weight: 600; color: var(--text); }
 .article-body tbody tr:nth-child(even) { background: #fafafa; }
+/* JS 注入的滚动容器：进一步增强老浏览器/某些 webview 的滚动体验 */
+.table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0; }
+.table-scroll > table { margin: 0; }
 [data-theme="dark"] { --primary: #818cf8; --primary-dark: #6366f1; --text: #e5e7eb; --text-light: #9ca3af; --bg: #111827; --card-bg: #1f2937; --border: #374151; --shadow: 0 10px 30px rgba(0, 0, 0, 0.3); --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.45); }
 body.reading-mode .sidebar, body.reading-mode .articles-grid { display: none; }
 body.reading-mode .site-layout { grid-template-columns: 1fr; max-width: 760px; }
@@ -122,133 +131,32 @@ body.sidebar-open .sidebar-toggle { transform: rotate(180deg); }
 .cta-card a { color: var(--primary); font-weight: 500; }
 /* ============================================
    响应式：768px 以下移动端适配
-   - 隐藏 sidebar（顶部 nav 已够用）
-   - header 导航横向滚动避免换行撑高
-   - 全局减小 padding，articles 单列
    ============================================ */
 @media (max-width: 768px) {
-    /* 隐藏侧边栏及 toggle 按钮：移动端用顶部 nav 替代 */
     .sidebar, .sidebar-toggle { display: none !important; }
     .site-layout { grid-template-columns: 1fr; gap: 0; margin: 16px auto 32px; padding: 0 12px; }
-
-    /* header 紧凑化：导航横向滚动不换行 */
     .site-header { padding: 10px 12px; gap: 8px; }
     .site-nav { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; justify-content: flex-start; margin: 0; -webkit-overflow-scrolling: touch; }
-    .site-nav::-webkit-scrollbar { display: none; } /* 隐藏滚动条保持美观 */
-
-    /* hero 减小 padding 和边距 */
+    .site-nav::-webkit-scrollbar { display: none; }
     .hero-compact { margin: 16px 12px 0; padding: 32px 20px; border-radius: 12px; }
-
-    /* articles-grid 单列，gap 收紧 */
     .articles-grid { grid-template-columns: 1fr; gap: 16px; }
-
-    /* section 减小左右 padding */
     .section { padding: 20px 16px; }
     .section h2 { font-size: 1.15rem; }
-
-    /* 文章页 padding 减小 */
     .article-body { padding: 20px 16px; }
     .article-header { padding: 40px 20px; }
     .article-page { padding: 0 12px; }
-
-    /* 双导航卡片纵向排列 */
+    .article-body table { font-size: 0.85rem; }
+    .article-body th, .article-body td { padding: 8px 10px; line-height: 1.5; }
     .article-nav .nav-card { flex: 1 1 100%; }
-
-    /* footer 紧凑 */
     .site-footer { padding: 24px 16px; margin-top: 32px; }
 }
 
-/* ============================================
-   超小屏（≤480px）：进一步收紧
-   ============================================ */
 @media (max-width: 480px) {
     .hero-compact { padding: 24px 16px; }
-    .hero-compact h1 { font-size: 1.4rem; }
-    .article-card { padding: 24px 16px; }
-    .article-icon { width: 52px; height: 52px; font-size: 24px; }
+    .hero-compact h1 { font-size: 1.35rem; }
+    .article-header h1 { font-size: 1.5rem; }
+    .article-body h2 { font-size: 1.3rem; }
+    .article-body { padding: 16px 12px; }
+    .article-body table { font-size: 0.8rem; }
+    .article-body th, .article-body td { padding: 6px 8px; }
 }
-
-/* ============================================
-   专题入口（首页双卡片 + 专题页空白态）
-   - .topic-card：首页双专题横向卡片
-   - .empty-state：专题页内容待补充的占位
-   ============================================ */
-.topics-heading {
-    font-size: 1.3rem;
-    margin: 8px 0 20px;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.topics-grid {
-    display: grid;
-    /* 自适应两列，窄屏自动单列 */
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
-    margin-bottom: 32px;
-}
-.topic-card {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    color: var(--text);
-    border: 1px solid transparent;
-}
-.topic-card:hover {
-    transform: translateY(-6px);
-    box-shadow: var(--shadow-hover);
-    color: var(--text);
-    border-color: var(--primary);
-}
-.topic-icon {
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-}
-.topic-info { flex: 1; min-width: 0; }
-.topic-info h3 {
-    font-size: 1.2rem;
-    margin: 0 0 8px;
-    color: var(--text);
-}
-.topic-info p {
-    color: var(--text-light);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin: 0 0 12px;
-}
-.topic-cta {
-    display: inline-block;
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-.empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    background: var(--bg);
-    color: var(--text-light);
-}
-.empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
-.empty-state .empty-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 8px;
-}
-.empty-state .empty-desc { font-size: 0.9rem; line-height: 1.7; }
-.empty-state a { color: var(--primary); font-weight: 500; }
