@@ -196,6 +196,19 @@ description: 这个 Skill 能做什么、什么场景该用它。这一行是触
     </article>
 
     <!-- 站点页脚 -->
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
     <footer class="site-footer">
         <p>© 2026 · kipozannaki</p>
     </footer>
