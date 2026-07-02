@@ -120,8 +120,50 @@ body.sidebar-open .sidebar-toggle { transform: rotate(180deg); }
 .cta-card .cta-text strong { display: block; margin-bottom: 2px; color: var(--text); }
 .cta-card .cta-text span { color: var(--text-light); font-size: 0.9rem; }
 .cta-card a { color: var(--primary); font-weight: 500; }
+/* ============================================
+   响应式：768px 以下移动端适配
+   - 隐藏 sidebar（顶部 nav 已够用）
+   - header 导航横向滚动避免换行撑高
+   - 全局减小 padding，articles 单列
+   ============================================ */
 @media (max-width: 768px) {
-    .site-layout { grid-template-columns: 1fr; gap: 24px; }
-    .sidebar { position: static; max-height: none; }
-    .hero-compact { margin: 32px 20px 0; padding: 36px 24px; }
+    /* 隐藏侧边栏及 toggle 按钮：移动端用顶部 nav 替代 */
+    .sidebar, .sidebar-toggle { display: none !important; }
+    .site-layout { grid-template-columns: 1fr; gap: 0; margin: 16px auto 32px; padding: 0 12px; }
+
+    /* header 紧凑化：导航横向滚动不换行 */
+    .site-header { padding: 10px 12px; gap: 8px; }
+    .site-nav { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; justify-content: flex-start; margin: 0; -webkit-overflow-scrolling: touch; }
+    .site-nav::-webkit-scrollbar { display: none; } /* 隐藏滚动条保持美观 */
+
+    /* hero 减小 padding 和边距 */
+    .hero-compact { margin: 16px 12px 0; padding: 32px 20px; border-radius: 12px; }
+
+    /* articles-grid 单列，gap 收紧 */
+    .articles-grid { grid-template-columns: 1fr; gap: 16px; }
+
+    /* section 减小左右 padding */
+    .section { padding: 20px 16px; }
+    .section h2 { font-size: 1.15rem; }
+
+    /* 文章页 padding 减小 */
+    .article-body { padding: 20px 16px; }
+    .article-header { padding: 40px 20px; }
+    .article-page { padding: 0 12px; }
+
+    /* 双导航卡片纵向排列 */
+    .article-nav .nav-card { flex: 1 1 100%; }
+
+    /* footer 紧凑 */
+    .site-footer { padding: 24px 16px; margin-top: 32px; }
+}
+
+/* ============================================
+   超小屏（≤480px）：进一步收紧
+   ============================================ */
+@media (max-width: 480px) {
+    .hero-compact { padding: 24px 16px; }
+    .hero-compact h1 { font-size: 1.4rem; }
+    .article-card { padding: 24px 16px; }
+    .article-icon { width: 52px; height: 52px; font-size: 24px; }
 }
