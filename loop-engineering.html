@@ -26,18 +26,16 @@
 
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">拆解：RELOO</a> · <a href="#shizhan">实战避坑</a> · <a href="#jueze">怎么设计</a> · <a href="#jieyu">结语</a></p>
 
-            <!-- ========== 一、引言 ========== -->
             <h2 id="intro">一、引言：为什么"改一次就交差"总是不够</h2>
             <p>这是本系列最后一篇，也是把前面五篇串起来的那根线。如果说 Agent 是手脚、Skill 是专业知识包、Harness 是盔甲、Context 是工作台、Prompt 是说明书——<strong>Loop Engineering 管的是：干完一次活之后，怎么知道这活到底干得好不好，要不要重干，重干的时候该往哪使劲</strong>。</p>
             <p>回头看前面四篇，"改一个变量、跑一轮、看数据、留下有用的"这个动作其实已经反复出现过：agent.html 里的消融实验、harness-engineering.html 里换模型后的拆解测试、context-engineering.html 里上下文策略的逐步调优、prompt-engineering.html 里 Prompt 的版本迭代——<strong>这些说的都是同一件事，只是套在了不同的壳子上</strong>。Loop Engineering 要做的，是把这件事从"每次凭感觉重新发明一遍"，变成一套<strong>有明确检查维度、有终止条件、有反馈机制的可复现流程</strong>。</p>
             <blockquote>💡 <strong>前面五篇讲的是"怎么让 AI 干活"，这一篇讲的是"怎么知道 AI 干得好不好，以及接下来该怎么办。</strong></blockquote>
 
-            <!-- ========== 二、坐标 ========== -->
             <h2 id="zuobiao">二、Loop Engineering 在工程体系里的坐标</h2>
             <table>
                 <thead>
                     <tr>
-                        <th></th>
+                        <th aria-hidden="true">　</th>
                         <th>凭感觉迭代</th>
                         <th>工程化 Loop</th>
                     </tr>
@@ -74,7 +72,6 @@
                 <li><strong>× Prompt Engineering</strong>　prompt-engineering.html 那句"你今天的解药，可能是明天的镣铐"，说的就是 Prompt 技巧本身也需要被纳入这套迭代闭环，跟着模型一起"发育"。</li>
             </ul>
 
-            <!-- ========== 三、拆解：RELOO ========== -->
             <h2 id="zujian">三、拆解：一个真实落地的 Loop Engineering 系统</h2>
             <p>光讲方法论容易流于空谈，这里直接上一个真实案例——我自己写的开源项目 <a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">RELOO</a>，一套面向 AI 编程助手的 Skill 与 Rules 配置体系，专门解决"AI 改代码时容易凭感觉一把梭——方向发散、遗漏边界、修复不验证"这个问题。</p>
             <p>RELOO 这个名字本身就是 Loop Engineering 的缩写：<strong>R</strong>eview、<strong>E</strong>valuate、<strong>L</strong>oop、<strong>O</strong>ptimize、<strong>O</strong>rchestrator（审查-评估-循环-优化-编排器）。核心流程是一条八步闭环：</p>
@@ -137,7 +134,6 @@
             </table>
             <p>"经验沉淀"这一步尤其值得展开：每轮发现的 Bug 模式，会被五问法根因分析后写进 <code>project_memory.md</code>，成为一份持续增长的模式库——这样下一次遇到类似问题，AI 不用再从零踩一遍坑。这跟 harness-engineering.html 里"把状态写进外部文件而不是靠记性"是同一个思路，只是这次沉淀的不是任务进度，而是<strong>踩过的坑本身</strong>。</p>
 
-            <!-- ========== 四、实战避坑 ========== -->
             <h2 id="shizhan">四、实战避坑：两个"血泪翻车现场"</h2>
 
             <h3>坑一：没有终止条件，AI 陷入无意义的反复修改</h3>
@@ -158,7 +154,6 @@
             <p>加一步根因分析和经验沉淀——RELOO 用五问法把每个 Bug 刨到根子上，归纳成模式写进 <code>project_memory.md</code>。下次遇到同类场景，AI 能直接查到"这类问题以前怎么破的"，而不是重新踩一遍。</p>
             <blockquote>💡 <strong>不沉淀经验的循环，本质上是在原地重复劳动，只是看起来像是在进步。</strong></blockquote>
 
-            <!-- ========== 五、怎么设计 ========== -->
             <h2 id="jueze">五、进阶：想设计自己的 Loop，从哪几步入手</h2>
             <ul>
                 <li><strong>把"检查"拆成互不重叠的固定维度</strong>——像 RELOO 的六轮矩阵那样，每轮只盯一件事，别指望一轮就把所有问题挑完</li>
@@ -167,7 +162,6 @@
                 <li><strong>加一环根因分析和经验沉淀</strong>——发现问题只是及格线，把问题模式提炼出来写进一份持续增长的记录，才是真正的复利</li>
             </ul>
 
-            <!-- ========== 六、结语 ========== -->
             <h2 id="jieyu">六、结语：六篇文章，其实讲的是同一件事的六个侧面</h2>
             <p><strong>给小白的话</strong>：一个 AI 产品用起来靠谱，从来不是因为它"聪明"，而是因为背后有人把"怎么让它靠谱"这件事拆成了六块——给它手脚（Agent）、给它专业知识（Skill）、给它安全带（Harness Engineering）、给它一张干净的工作台（Context Engineering）、给它写清楚的说明书（Prompt Engineering）、给它一套知道什么时候该停、该记什么教训的复盘机制（Loop Engineering）。少了任何一块，前面几块做得再好也白搭。</p>
             <p><strong>给开发者的话</strong>：如果你从 Agent 这篇一路读到这里，会发现很多"金句"其实在反复被引用——"上下文是工作台不是仓库"、"今天的解药可能是明天的镣铐"、"别让运动员自己当裁判"。这不是巧合，是因为这六个概念本来就不是六个孤立的知识点，是<strong>同一套工程体系从六个角度看过去的样子</strong>。真正上手做一个 Agent 项目时，你会同时用到全部六种手艺，而不是挑一种就够。</p>
@@ -175,7 +169,6 @@
 
             <p class="refs"><strong>参考资料</strong>：<a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">kipozannaki/RELOO</a> —— AI 驱动的多轮代码迭代自审工程框架（MIT 协议开源）</p>
 
-            <!-- 跨文章导航：上一站 Prompt Engineering / 下一站 回到起点 Agent -->
             <nav class="article-nav">
                 <a href="prompt-engineering.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -197,7 +190,6 @@
         </div>
     </article>
 
-    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
