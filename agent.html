@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 文章页：Agent 工业级落地（重写版，5 大部分长文） -->
+<!-- 文章页：Agent 工业级落地（重写版，5 大部分长文 + 坐标关系新增段） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -28,15 +28,71 @@
         </header>
         <div class="article-body">
 
+            <p class="toc">跳转：<a href="#yinyan">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#xuanxing">选型抉择</a> · <a href="#shizhan">实战避坑</a> · <a href="#jinjie">进阶与度量</a> · <a href="#jieyu">结语</a></p>
+
             <!-- ========== 一、引言 ========== -->
-            <h2>一、引言：别再谈大模型了，现在是 Agent 的时代</h2>
+            <h2 id="yinyan">一、引言：别再谈大模型了，现在是 Agent 的时代</h2>
             <p>如果你跟朋友说"我搞 AI 的"，对方大概率会问："大模型是啥呀？"——其实你可以这样回答：<strong>大模型就是三国里的诸葛亮</strong>。博古通今、运筹帷幄、张口就是锦囊妙计。但诸葛亮有个致命问题：<strong>他没有手脚</strong>。你让他去订个外卖、调个数据库、写个 Python 脚本，他只能给你一堆"建议"和"思路"。</p>
             <p><strong>AI Agent 是什么？</strong>是给诸葛亮装上手脚、配上工具箱的"特种兵"。你只管下达目标："把这周的销售数据整理成 PPT 发给老板"，他立刻开始规划：先查数据库、再算数据、再生成 PPT、再调邮件接口发送——<strong>全程不需要你插手</strong>。</p>
             <p>从工程视角看，Agent 的硬核定义是：<strong>Agent = LLM（大脑）+ Memory（记性）+ Tools（工具箱）+ Planning（规划能力）</strong>。它不是更长的 Prompt，而是一个<strong>以大模型为核心决策引擎的分布式软件系统</strong>。</p>
             <blockquote>💡 真正的 Agent 开发，不是让 LLM 写更多话，而是让 LLM 当调度员。</blockquote>
 
-            <!-- ========== 二、选型 ========== -->
-            <h2>二、选型抉择：搭积木的"全家桶"，还是自己手撕底层？</h2>
+            <!-- ========== 二、坐标：Agent 在工程体系里的位置（新增） ========== -->
+            <h2 id="zuobiao">二、Agent 在工程体系里的坐标</h2>
+            <p>先把"自主程度"这把尺子亮出来——很多人分不清 Agent 和 Chatbot、Workflow 到底差在哪：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>普通 LLM 问答</th>
+                        <th>Chatbot</th>
+                        <th>Workflow 自动化</th>
+                        <th>Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>有没有记忆</td>
+                        <td>无</td>
+                        <td>有</td>
+                        <td>通常无</td>
+                        <td>有</td>
+                    </tr>
+                    <tr>
+                        <td>会不会用工具</td>
+                        <td>不会</td>
+                        <td>很少</td>
+                        <td>靠人预先编排</td>
+                        <td>自己决定调不调、调哪个</td>
+                    </tr>
+                    <tr>
+                        <td>步骤谁定的</td>
+                        <td>没有步骤</td>
+                        <td>没有步骤</td>
+                        <td>人写死的固定流程</td>
+                        <td>模型自己规划</td>
+                    </tr>
+                    <tr>
+                        <td>出错谁兜底</td>
+                        <td>用户自己</td>
+                        <td>用户自己</td>
+                        <td>提前写好的异常分支</td>
+                        <td>需要 Harness 层硬性兜底</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>这把尺子理清楚之后，再看 Agent 和本站另外五个概念是什么关系——它们不是孤立的科普词条，而是同一套工程体系里互相咬合的齿轮：</p>
+            <ul>
+                <li><strong>× Skill</strong>　本文第三节那份 JSON Schema，就是给 Agent 装的"手"——决定它能做什么。如果这只手要变得更专业、带上一整套工作流和参考资料，那就是 skill.html 讲的 SKILL.md：把"能调用什么工具"升级成"这类任务该按什么流程做"。一个管"有没有这双手"，一个管"这双手熟不熟练"。</li>
+                <li><strong>× Context Engineering</strong>　第四节"坑二"里的 Payload 裁剪、滑窗摘要，说白了就是 Context Engineering 在 Agent 场景里的具体打法——"上下文是工作台不是仓库"这句话本身就是它的核心信条。</li>
+                <li><strong>× Prompt Engineering</strong>　Schema 里 description 怎么写、System Prompt 怎么给 Agent 划定角色边界，全是 Prompt Engineering 的手艺活。Agent 的智商上限由模型决定，下限往往是 Prompt 写得糙不糙。</li>
+                <li><strong>× Harness Engineering</strong>　"硬编码计数器 + 超时切断"、"工具返回阻断信号"，这些机制就是 Harness 层在给 Agent 的自由裁量权画红线——Agent 越自主，Harness 就该收得越紧，不然它真敢把你家拆了。</li>
+                <li><strong>× Loop Engineering</strong>　第五节的消融实验就是最直接的例子——Agent 效果好不好不是拍脑袋定的，是靠"改一个变量、跑一轮、对比数据"的迭代闭环，这个闭环就是 Loop Engineering。</li>
+            </ul>
+            <blockquote>💡 <strong>Agent 是执行的躯壳，Skill 是装进去的专业知识，Context / Prompt / Harness / Loop Engineering 是让这具躯壳不失控的四道工序。</strong></blockquote>
+
+            <!-- ========== 三、选型 ========== -->
+            <h2 id="xuanxing">三、选型抉择：搭积木的"全家桶"，还是自己手撕底层？</h2>
             <p>想搭一个 Agent 系统，你有两个选择：</p>
             <p><strong>A 套餐：精装拎包入住的样板房</strong>——LangChain、CrewAI、AutoGen 这些重型框架。里面啥都有：Agent 基类、Tool 抽象、Memory 后端、几十种 Chain 模板。几天就能上线一个 Demo。但问题是，你以后想改个水管（Debug 一下调用链）？对不起，水管藏在墙里，trace 进去发现 5 层包装、3 个抽象基类、2 个 Mixin。<strong>改个字段名要翻三个文件</strong>。</p>
             <p><strong>B 套餐：自己买砖盖楼</strong>——直接调各家 LLM 厂的原生 API（OpenAI Function Calling、Anthropic Tool Use），再自己写一个轻量的 Workflow 引擎控制循环。<strong>前期累，但每个螺丝钉都是你的</strong>，出了 Bug 一眼能看见。</p>
@@ -75,8 +131,8 @@
             <p>剩下的活儿——查数据库、调 API、生成文件——<strong>全交给传统软件代码</strong>。别让 LLM 去执行 SQL、别让 LLM 去算 1+1，这些是 CPU 的活儿。</p>
             <blockquote>💡 大模型不执行代码，它只做两件事——<strong>决策分发（路由）</strong>与<strong>参数解析</strong>。剩下的活儿，全交给传统软件。</blockquote>
 
-            <!-- ========== 三、实战避坑 ========== -->
-            <h2>三、实战避坑：单 Agent 结合工具的两个"血泪翻车现场"</h2>
+            <!-- ========== 四、实战避坑 ========== -->
+            <h2 id="shizhan">四、实战避坑：单 Agent 结合工具的两个"血泪翻车现场"</h2>
 
             <h3>坑一：死循环与"Token 碎纸机"</h3>
             <p><strong>翻车现场还原</strong>：</p>
@@ -149,8 +205,8 @@ for i in range(MAX_ITERATIONS):
             self.history = self.history[self.summary_window:]</code></pre>
             <blockquote>💡 <strong>上下文不是仓库，是工作台</strong>——只放当前需要的工具，别把整个五金店搬进来。</blockquote>
 
-            <!-- ========== 四、进阶与度量 ========== -->
-            <h2>四、进阶与度量：如何让 Agent 别跑偏？</h2>
+            <!-- ========== 五、进阶与度量 ========== -->
+            <h2 id="jinjie">五、进阶与度量：如何让 Agent 别跑偏？</h2>
 
             <h3>提示词与反思的度</h3>
             <p>很多教程教你让 Agent"自我反思"——错了就反思、反思完再试、再错再反思。听起来很美，<strong>实际上反思是个奢侈品</strong>：</p>
@@ -174,8 +230,8 @@ baseline   v1            5      3 轮      72%      8K
             <p>从表格能看出：加了反思成功率提升 3 个点，但 Token 几乎翻倍——<strong>性价很低</strong>。精简掉一个不常用的工具，成功率几乎不变但 Token 下降 14%——<strong>这是优选</strong>。</p>
             <blockquote>💡 <strong>Agent 工程不是"我觉得"，是"数据说"</strong>。没有消融实验，不要轻易上线。</blockquote>
 
-            <!-- ========== 五、结语 ========== -->
-            <h2>五、结语：拿到 AI 时代真正的"船票"</h2>
+            <!-- ========== 六、结语 ========== -->
+            <h2 id="jieyu">六、结语：拿到 AI 时代真正的"船票"</h2>
             <p><strong>给小白的话</strong>：不用被那些术语吓到——找个低代码平台（比如 Dify、Coze、扣子），<strong>亲手搭一个能用的 Agent</strong>，比读 10 篇科普文都管用。技术从来不是看会的，是干会的。</p>
             <p><strong>给开发者的话</strong>：别再满足于"我会调 LangChain"——<strong>亲手撕开底层</strong>，写一个基于 Schema 的原生 Skill，写一个轻量的 Workflow 控制循环，写一组消融实验数据对比效果。<strong>从"调包侠"走向"系统架构师"，这才是 Agent 时代真正的护城河</strong>。</p>
             <blockquote>💡 <strong>不要做 AI 的搬运工，要做 AI 的建筑师。</strong></blockquote>
