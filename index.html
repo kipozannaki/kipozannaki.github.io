@@ -1,25 +1,20 @@
 <!DOCTYPE html>
-<!-- 首页：双列布局 + 5 个 section + 暗色/阅读模式切换
+<!-- 首页：双专题入口 + 5 个 section + 暗色/阅读模式切换
      参考 https://bobcgn.github.io/quartz-myblogs/ 的极简索引风格 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>kipozannaki · AI 主题内容站</title>
-    <meta name="description" content="LLM 应用工程体系的实战笔记与沉淀">
+    <meta name="description" content="LLM 应用工程体系与 AI 基础算法的实战笔记与沉淀">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 站点 Header：Logo + 6 篇文章导航 + 暗色/阅读模式切换按钮 -->
     <header class="site-header">
         <a href="index.html" class="logo">📚 kipozannaki</a>
         <nav class="site-nav">
-            <a href="agent.html">Agent</a>
-            <a href="skill.html">Skill</a>
-            <a href="harness-engineering.html">Harness Engineering</a>
-            <a href="context-engineering.html">Context Engineering</a>
-            <a href="prompt-engineering.html">Prompt Engineering</a>
-            <a href="loop-engineering.html">Loop Engineering</a>
+            <a href="application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -27,25 +22,18 @@
         </div>
     </header>
 
-    <!-- Hero 轻量版：渐变小标题 -->
     <section class="hero-compact">
         <h1>AI 主题内容站</h1>
-        <p>LLM 应用工程体系的实战笔记与沉淀</p>
+        <p>LLM 应用工程 + AI 底层算法的实战笔记与沉淀</p>
     </section>
 
-    <!-- 双列布局：左侧 sticky 索引 + 右侧主内容 -->
     <div class="site-layout">
         <aside class="sidebar">
-            <!-- 展开/收起切换按钮：浮动在 sidebar 右边缘 -->
             <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="展开/收起导航" aria-label="展开或收起导航">›</button>
             <div class="sidebar-group">
-                <h3 class="sidebar-title">📚 站内文章</h3>
-                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🧠</span><span class="text">Agent</span></a>
-                <a href="skill.html" class="sidebar-item" title="Skill"><span class="icon">🛠️</span><span class="text">Skill</span></a>
-                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">🔧</span><span class="text">Harness Engineering</span></a>
-                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">📚</span><span class="text">Context Engineering</span></a>
-                <a href="prompt-engineering.html" class="sidebar-item" title="Prompt Engineering"><span class="icon">✍️</span><span class="text">Prompt Engineering</span></a>
-                <a href="loop-engineering.html" class="sidebar-item" title="Loop Engineering"><span class="icon">🔄</span><span class="text">Loop Engineering</span></a>
+                <h3 class="sidebar-title">📂 专题</h3>
+                <a href="application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
+                <a href="foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">🔗 站内导航</h3>
@@ -58,18 +46,29 @@
         </aside>
 
         <main>
-            <div class="articles-grid">
-                <a href="agent.html" class="article-card"><div class="article-icon">🧠</div><h3>Agent</h3><p>智能体架构与自主决策</p></a>
-                <a href="skill.html" class="article-card"><div class="article-icon">🛠️</div><h3>Skill</h3><p>AI 工具能力的最小单元</p></a>
-                <a href="harness-engineering.html" class="article-card"><div class="article-icon">🔧</div><h3>Harness Engineering</h3><p>LLM 应用的工程化框架</p></a>
-                <a href="context-engineering.html" class="article-card"><div class="article-icon">📚</div><h3>Context Engineering</h3><p>上下文管理的设计原则</p></a>
-                <a href="prompt-engineering.html" class="article-card"><div class="article-icon">✍️</div><h3>Prompt Engineering</h3><p>提示词工程的系统方法</p></a>
-                <a href="loop-engineering.html" class="article-card"><div class="article-icon">🔄</div><h3>Loop Engineering</h3><p>循环工程的迭代方法论</p></a>
+            <h2 class="topics-heading">📂 专题</h2>
+            <div class="topics-grid">
+                <a href="application.html" class="topic-card">
+                    <div class="topic-icon">📦</div>
+                    <div class="topic-info">
+                        <h3>Application & Orchestration</h3>
+                        <p>怎么把 LLM 用起来：Agent / Skill / Harness / Context / Prompt / Loop 六块拼图，6 篇实战笔记。</p>
+                        <span class="topic-cta">进入专题 →</span>
+                    </div>
+                </a>
+                <a href="foundation.html" class="topic-card">
+                    <div class="topic-icon">🧬</div>
+                    <div class="topic-info">
+                        <h3>Foundation & Core Algorithms</h3>
+                        <p>AI 本身是怎么工作的：模型结构、训练范式、推理优化、评测方法。内容建设中。</p>
+                        <span class="topic-cta">进入专题 →</span>
+                    </div>
+                </a>
             </div>
 
             <section id="about-site" class="section">
                 <h2>🏠 关于本站</h2>
-                <p>这是我的 AI 工程主题站，专门写 LLM 应用工程体系。每一篇都是“读 + 写 + 改”的实战笔记——不是把官方文档换个皮，是“我跑一遍踩了哪些坑、最后怎么收的口”。</p>
+                <p>这是我的 AI 工程主题站，专门写 LLM 应用工程体系。每一篇都是"读 + 写 + 改"的实战笔记——不是把官方文档换个皮，是"我跑一遍踩了哪些坑、最后怎么收的口"。</p>
                 <p>目标读者：想用 LLM 做点真东西、不想被 PPT 词条忽悠的开发者；刚开始上路不知道怎么做的新手小白。</p>
             </section>
 
@@ -81,7 +80,7 @@
             <section id="tech-focus" class="section">
                 <h2>🎯 技术关注点</h2>
                 <ul>
-                    <li><strong>LLM 工程化</strong>：Agent / Skill / Harness / Context / Prompt / Loop Engineering 完整链路，从“调包”到“能稳定跑”</li>
+                    <li><strong>LLM 工程化</strong>：Agent / Skill / Harness / Context / Prompt / Loop Engineering 完整链路，从"调包"到"能稳定跑"</li>
                     <li><strong>深度学习实战</strong>：CNN 视觉任务，模型设计 + 训练调优</li>
                     <li><strong>端到端小工具</strong>：从想法到上线全流程自己扛（CertRun、视频增强、数据备份）</li>
                     <li><strong>AI + 实际场景</strong>：把模型能力塞进真实业务里，而不是只停在 notebook</li>
@@ -124,7 +123,6 @@
             const theme = savedTheme || (sysDark ? 'dark' : 'light');
             document.documentElement.setAttribute('data-theme', theme);
             if (localStorage.getItem('reading') === '1') document.body.classList.add('reading-mode');
-            // 侧边栏默认收起，记忆用户的展开/收起偏好
             if (localStorage.getItem('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
 
             const themeBtn = document.getElementById('theme-toggle');
@@ -139,15 +137,12 @@
                 themeBtn.classList.toggle('active');
                 localStorage.setItem('theme', next);
             });
-
             readBtn.addEventListener('click', () => {
                 document.body.classList.toggle('reading-mode');
                 const on = document.body.classList.contains('reading-mode');
                 readBtn.classList.toggle('active');
                 localStorage.setItem('reading', on ? '1' : '0');
             });
-
-            // 侧边栏展开/收起切换
             sideBtn.addEventListener('click', () => {
                 document.body.classList.toggle('sidebar-open');
                 const on = document.body.classList.contains('sidebar-open');

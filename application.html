@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!-- Application & Orchestration 专题页：列出该专题下所有文章 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application & Orchestration · kipozannaki</title>
+    <meta name="description" content="LLM 应用的工程化体系：Agent / Skill / Harness / Context / Prompt / Loop">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html" class="active">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <section class="hero-compact">
+        <h1>Application & Orchestration</h1>
+        <p>LLM 应用的工程化体系 · 6 篇实战笔记</p>
+    </section>
+
+    <div class="site-layout">
+        <aside class="sidebar">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="展开/收起导航" aria-label="展开或收起导航">›</button>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📂 专题</h3>
+                <a href="application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
+                <a href="foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 本专题文章</h3>
+                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🧠</span><span class="text">Agent</span></a>
+                <a href="skill.html" class="sidebar-item" title="Skill"><span class="icon">🛠️</span><span class="text">Skill</span></a>
+                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">🔧</span><span class="text">Harness Engineering</span></a>
+                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">📚</span><span class="text">Context Engineering</span></a>
+                <a href="prompt-engineering.html" class="sidebar-item" title="Prompt Engineering"><span class="icon">✍️</span><span class="text">Prompt Engineering</span></a>
+                <a href="loop-engineering.html" class="sidebar-item" title="Loop Engineering"><span class="icon">🔄</span><span class="text">Loop Engineering</span></a>
+            </div>
+        </aside>
+
+        <main>
+            <section class="section">
+                <h2>📦 专题说明</h2>
+                <p>这一专题聚焦"怎么把 LLM 用起来"——围绕 Agent 这个执行载体，依次讲清楚它的六块拼图：</p>
+                <ul>
+                    <li><strong>Agent</strong>　是执行的躯壳，决定"谁来做"</li>
+                    <li><strong>Skill</strong>　是装进躯壳的专业知识，决定"做得多专业"</li>
+                    <li><strong>Harness Engineering</strong>　是给它画的红线，决定"在多大范围内自主"</li>
+                    <li><strong>Context Engineering</strong>　是它的工作台，决定"一次能拿多少信息"</li>
+                    <li><strong>Prompt Engineering</strong>　是它的指令，决定"怎么理解任务"</li>
+                    <li><strong>Loop Engineering</strong>　是它的迭代闭环，决定"怎么越做越好"</li>
+                </ul>
+                <p>六篇互相咬合，建议按顺序读——前一篇文章里的概念，会在下一篇里被重新调用。</p>
+            </section>
+
+            <section class="section">
+                <h2>📚 本专题文章</h2>
+                <div class="articles-grid">
+                    <a href="agent.html" class="article-card">
+                        <div class="article-icon">🧠</div>
+                        <h3>Agent</h3>
+                        <p>智能体架构与自主决策</p>
+                    </a>
+                    <a href="skill.html" class="article-card">
+                        <div class="article-icon">🛠️</div>
+                        <h3>Skill</h3>
+                        <p>AI 工具能力的最小单元</p>
+                    </a>
+                    <a href="harness-engineering.html" class="article-card">
+                        <div class="article-icon">🔧</div>
+                        <h3>Harness Engineering</h3>
+                        <p>LLM 应用的工程化框架</p>
+                    </a>
+                    <a href="context-engineering.html" class="article-card">
+                        <div class="article-icon">📚</div>
+                        <h3>Context Engineering</h3>
+                        <p>上下文管理的设计原则</p>
+                    </a>
+                    <a href="prompt-engineering.html" class="article-card">
+                        <div class="article-icon">✍️</div>
+                        <h3>Prompt Engineering</h3>
+                        <p>提示词工程的系统方法</p>
+                    </a>
+                    <a href="loop-engineering.html" class="article-card">
+                        <div class="article-icon">🔄</div>
+                        <h3>Loop Engineering</h3>
+                        <p>循环工程的迭代方法论</p>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (sysDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            if (localStorage.getItem('reading') === '1') document.body.classList.add('reading-mode');
+            if (localStorage.getItem('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
+
+            const themeBtn = document.getElementById('theme-toggle');
+            const readBtn = document.getElementById('reading-toggle');
+            const sideBtn = document.getElementById('sidebar-toggle');
+            if (theme === 'dark') themeBtn.classList.add('active');
+            if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+
+            themeBtn.addEventListener('click', () => {
+                const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                themeBtn.classList.toggle('active');
+                localStorage.setItem('theme', next);
+            });
+            readBtn.addEventListener('click', () => {
+                document.body.classList.toggle('reading-mode');
+                const on = document.body.classList.contains('reading-mode');
+                readBtn.classList.toggle('active');
+                localStorage.setItem('reading', on ? '1' : '0');
+            });
+            sideBtn.addEventListener('click', () => {
+                document.body.classList.toggle('sidebar-open');
+                const on = document.body.classList.contains('sidebar-open');
+                localStorage.setItem('sidebarOpen', on ? '1' : '0');
+            });
+        })();
+    </script>
+</body>
+</html>
