@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- 文章页：Prompt Engineering -->
+<!-- 文章页：Prompt Engineering 工业级落地 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prompt Engineering · kipozannaki</title>
-    <meta name="description" content="提示词工程的系统方法">
+    <meta name="description" content="Prompt Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,13 +19,151 @@
 
     <article class="article-page">
         <header class="article-header">
-            <h1>✍️ Prompt Engineering</h1>
-            <p class="meta">提示词工程的系统方法</p>
+            <h1>✍️ Prompt Engineering 工业级落地</h1>
+            <p class="meta">从"碰运气写话"到"结构化沟通" · 双栖科普</p>
         </header>
         <div class="article-body">
-            <div class="placeholder">
-                <p>📝 内容待补充</p>
-            </div>
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">拆解</a> · <a href="#shizhan">实战避坑</a> · <a href="#jueze">怎么调</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
+            <h2 id="intro">一、引言："Prompt Engineering 过时了"这个说法要纠正一下</h2>
+            <p>context-engineering.html 里立过一个规矩：<strong>Prompt Engineering 管"这句话该怎么写"，Context Engineering 管"这一刻该不该让模型看到这句话"</strong>。不少人把这句话理解成"Prompt Engineering 已经没用了，都被 Context Engineering 取代了"——这是个误读。工作台上摆对了工具，操作手册写得含糊不清，照样会出岔子。<strong>Context Engineering 决定这一刻工作台上摆哪些东西，Prompt Engineering 决定这些东西上面写的字，别人看不看得懂</strong>。前者没有让后者过时，只是把后者的地盘从"全部"收缩成了"这一块"——但这一块依然是硬手艺，写得好和写得烂之间的差距，比大多数人想象得大得多。</p>
+            <p>Anthropic 自己给开发者的建议里，反复强调的高杠杆技巧就三样：<strong>把要求说清楚、给例子而不是罗列规则、该分步骤推理的地方明确要求分步骤</strong>。听起来朴素，但真正做到的人不多。</p>
+            <blockquote>💡 <strong>Context Engineering 决定工作台上摆什么，Prompt Engineering 决定说明书写得清不清楚——两件事都没做好，光有工具也没用。</strong></blockquote>
+
+            <!-- ========== 二、坐标 ========== -->
+            <h2 id="zuobiao">二、Prompt Engineering 在工程体系里的坐标</h2>
+            <p>先看同一个需求，含糊表达和结构化表达的差距：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>含糊表达</th>
+                        <th>结构化表达</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>目标</td>
+                        <td>"写得好一点"</td>
+                        <td>说清楚"好"的具体标准是什么</td>
+                    </tr>
+                    <tr>
+                        <td>要求</td>
+                        <td>一段话罗列一堆规则</td>
+                        <td>2～3 个高质量例子代替规则罗列</td>
+                    </tr>
+                    <tr>
+                        <td>结构</td>
+                        <td>指令、数据、例子混在一起</td>
+                        <td>用 XML 标签分开，各管各的</td>
+                    </tr>
+                    <tr>
+                        <td>复杂任务</td>
+                        <td>指望模型一步到位</td>
+                        <td>拆成生成 → 审查 → 改进的链条</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>放进本站坐标系里：</p>
+            <ul>
+                <li><strong>× Agent</strong>　agent.html 里说过，"Schema 里 description 怎么写、System Prompt 怎么给 Agent 划定角色边界，全是 Prompt Engineering 的手艺活"。Agent 的智商上限由模型决定，下限往往是 Prompt 写得糙不糙——这句话在那篇文章里已经埋下了。</li>
+                <li><strong>× Skill</strong>　SKILL.md 的正文本身就是一段会被"按需注入"的高阶 Prompt。写 SKILL.md 拼的不是别的，就是 Prompt Engineering 的功底——把一套操作流程用模型能稳定听懂的方式写下来。</li>
+                <li><strong>× Context Engineering</strong>　边界已经在上一篇划清楚了：一个管"写什么"，一个管"这一刻该不该给"。这里不重复展开，只强调一句——两者是互补关系，不是替代关系。</li>
+                <li><strong>× Harness Engineering</strong>　harness-engineering.html 里说过，"Prompt 负责让模型听懂，Harness 负责让整套系统扛得住"。Prompt 写得再漂亮，没有 Harness 兜底出错怎么办，照样是纸上谈兵。</li>
+                <li><strong>× Loop Engineering</strong>　Prompt 写得好不好不能靠语感拍板，得有测试集、有 A/B 对比、有版本迭代——这仍然是 Loop Engineering 的地盘。</li>
+            </ul>
+
+            <!-- ========== 三、拆解 ========== -->
+            <h2 id="zujian">三、拆解：几个杠杆最高的手艺</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>技巧</th>
+                        <th>解决什么问题</th>
+                        <th>怎么用</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>说清楚目标和成功标准</td>
+                        <td>模糊指令导致产出漂移，改了三版还是不对</td>
+                        <td>不说"写得好一点"，说清楚"好"具体指什么</td>
+                    </tr>
+                    <tr>
+                        <td>Few-shot 示例</td>
+                        <td>讲一堆道理不如给个样板</td>
+                        <td>2～3 个高质量例子，比长篇规则说明更管用</td>
+                    </tr>
+                    <tr>
+                        <td>XML 标签结构化</td>
+                        <td>指令、数据、例子混在一起，模型容易串</td>
+                        <td>用 <code>&lt;instructions&gt;</code>、<code>&lt;data&gt;</code>、<code>&lt;examples&gt;</code> 分开</td>
+                    </tr>
+                    <tr>
+                        <td>显式要求分步推理</td>
+                        <td>复杂任务一步到位容易漏掉中间环节</td>
+                        <td>用 <code>&lt;thinking&gt;</code>/<code>&lt;answer&gt;</code> 分离推理过程和最终结果</td>
+                    </tr>
+                    <tr>
+                        <td>Prompt Chaining</td>
+                        <td>单个 Prompt 扛不住的复杂任务</td>
+                        <td>拆成"生成 → 审查 → 改进"的链条，每一环只干一件事</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一个最小的 XML 结构化示例，混乱版和结构化版差距一目了然：</p>
+            <pre><code>&lt;!-- 混乱版：指令、数据、要求全挤在一段话里 --&gt;
+帮我看看这份财报数据{{DATA}}，写一份给投资人看的报告，
+要包含营收增长、利润率、现金流，语气要专业但不要太生硬
+
+&lt;!-- 结构化版：各管各的 --&gt;
+&lt;data&gt;{{DATA}}&lt;/data&gt;
+&lt;instructions&gt;
+1. 生成一份面向投资人的财报解读
+2. 必须包含：营收增长、利润率、现金流
+3. 语气专业但不生硬
+&lt;/instructions&gt;</code></pre>
+            <p>模型是能从第一种混乱版里"猜"出你想要什么，但结构化版把猜的成分降到最低——这也是为什么 Claude 被专门训练成能识别 XML 结构：标签名不需要多讲究，语义清楚、模型能对上号就行。</p>
+
+            <!-- ========== 四、实战避坑 ========== -->
+            <h2 id="shizhan">四、实战避坑：两个"血泪翻车现场"</h2>
+
+            <h3>坑一：一整段话塞满所有要求，模型抓不住重点</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>一段两百字的指令里塞了角色设定、任务要求、输出格式、边界条件，全挤在一起，中间夹杂着示例文本。模型经常漏掉某条格式要求，或者把示例里的内容当成了正文的一部分。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>指令、数据、例子混在一起，模型很难分清楚"这句话是要求，还是数据，还是参考例子"——这不是模型笨，是<strong>你自己都没把这几类信息分清楚</strong>。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>用 XML 标签把不同性质的信息物理分开，各自装进各自的标签里。这一步做完，很多"漏要求""看串行"的问题会直接消失。</p>
+            <blockquote>💡 <strong>模型不是读不懂你的话，是你把好几件事混在一句话里说，换成人也未必分得清。</strong></blockquote>
+
+            <h3>坑二：抱着过时的老技巧不放，新模型上反而报错</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>一个团队沿用了很久的老技巧——通过"预填充"（prefill）助手回复的开头来强行控制输出格式，在老模型上一直好使。换上新一代模型后，这段代码直接报错。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>这个技巧当年是为了弥补模型指令遵循能力不够强的缺陷——本质上和 harness-engineering.html 里讲的"每个组件都在补偿模型的某个弱点"是同一回事。新一代模型的指令遵循能力已经强到不需要这个补丁，<strong>某些新模型甚至直接不再支持这种用法</strong>，硬用就会出错。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>换模型之后，别急着把老 Prompt 原样搬过去。挑几个关键技巧重新测一遍，看看还需不需要——这跟维护 Harness 是一个思路：<strong>你今天的解药，可能是明天的镣铐</strong>。</p>
+            <blockquote>💡 <strong>Prompt 技巧也有保质期，跟 Harness 组件一样，得跟着模型一起"发育"。</strong></blockquote>
+
+            <!-- ========== 五、怎么调 ========== -->
+            <h2 id="jueze">五、进阶：产出不对劲，先查哪里</h2>
+            <ul>
+                <li>产出方向跑偏 → 先检查有没有把"目标"和"成功标准"说清楚，而不是急着加更多规则</li>
+                <li>产出格式混乱、看串行 → 上 XML 标签，把指令、数据、例子物理分开</li>
+                <li>复杂任务一步到位质量差 → 拆成生成 → 审查 → 改进的链条，或者显式要求分步推理</li>
+                <li>同一套 Prompt 换了新模型效果反而变差 → 别急着加复杂度，先测试能不能删——参考 harness-engineering.html 的"拆解测试"方法论</li>
+            </ul>
+
+            <!-- ========== 六、结语 ========== -->
+            <h2 id="jieyu">六、结语：说清楚，是最被低估的技术能力</h2>
+            <p><strong>给小白的话</strong>：跟 AI 对话效果不好，先别怀疑模型笨，回头看看自己是不是把要求说清楚了——这跟跟人沟通是一个道理，说不清楚，谁来做都难。</p>
+            <p><strong>给开发者的话</strong>：别把 Prompt Engineering 当成"随便试试措辞"的体力活。它和写代码一样需要结构、需要版本管理、需要测试——一段没有 XML 结构、没有例子、混杂着模糊要求的 Prompt，和一段没有缩进、没有注释、全写在一行的代码，本质上是同一种不负责任。</p>
+            <blockquote>💡 <strong>会写 Prompt 的人和不会写的人，差的不是运气，是有没有把"说清楚"当成一门正经手艺来练。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Anthropic 官方文档《Prompting best practices》及 Prompt Engineering 系列指南</p>
 
             <!-- 跨文章导航：上一站 Context Engineering / 下一站 Loop Engineering -->
             <nav class="article-nav">
@@ -39,7 +177,7 @@
                 <a href="loop-engineering.html" class="nav-card nav-next">
                     <span class="nav-content">
                         <span class="nav-label">下一站</span>
-                        <span class="nav-title">🔄 Loop Engineering</span>
+                        <span class="nav-title">� Loop Engineering</span>
                     </span>
                     <span class="nav-arrow">→</span>
                 </a>

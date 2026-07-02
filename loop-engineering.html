@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- 文章页：Loop Engineering -->
+<!-- 文章页：Loop Engineering 工业级落地（系列收官篇） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loop Engineering · kipozannaki</title>
-    <meta name="description" content="循环工程的迭代方法论">
+    <meta name="description" content="Loop Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,15 +19,163 @@
 
     <article class="article-page">
         <header class="article-header">
-            <h1>🔄 Loop Engineering</h1>
-            <p class="meta">循环工程的迭代方法论</p>
+            <h1>� Loop Engineering 工业级落地</h1>
+            <p class="meta">从"凭感觉一把梭"到"有章可循的迭代闭环" · 双栖科普</p>
         </header>
         <div class="article-body">
-            <div class="placeholder">
-                <p>📝 内容待补充</p>
-            </div>
 
-            <!-- 跨文章导航：loop 是末篇，无下一站，仅上一站 Prompt Engineering -->
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">拆解：RELOO</a> · <a href="#shizhan">实战避坑</a> · <a href="#jueze">怎么设计</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
+            <h2 id="intro">一、引言：为什么"改一次就交差"总是不够</h2>
+            <p>这是本系列最后一篇，也是把前面五篇串起来的那根线。如果说 Agent 是手脚、Skill 是专业知识包、Harness 是盔甲、Context 是工作台、Prompt 是说明书——<strong>Loop Engineering 管的是：干完一次活之后，怎么知道这活到底干得好不好，要不要重干，重干的时候该往哪使劲</strong>。</p>
+            <p>回头看前面四篇，"改一个变量、跑一轮、看数据、留下有用的"这个动作其实已经反复出现过：agent.html 里的消融实验、harness-engineering.html 里换模型后的拆解测试、context-engineering.html 里上下文策略的逐步调优、prompt-engineering.html 里 Prompt 的版本迭代——<strong>这些说的都是同一件事，只是套在了不同的壳子上</strong>。Loop Engineering 要做的，是把这件事从"每次凭感觉重新发明一遍"，变成一套<strong>有明确检查维度、有终止条件、有反馈机制的可复现流程</strong>。</p>
+            <blockquote>💡 <strong>前面五篇讲的是"怎么让 AI 干活"，这一篇讲的是"怎么知道 AI 干得好不好，以及接下来该怎么办"。</strong></blockquote>
+
+            <!-- ========== 二、坐标 ========== -->
+            <h2 id="zuobiao">二、Loop Engineering 在工程体系里的坐标</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>凭感觉迭代</th>
+                        <th>工程化 Loop</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>什么时候停</td>
+                        <td>"感觉差不多了"</td>
+                        <td>明确的终止条件（比如连续一轮无新问题）</td>
+                    </tr>
+                    <tr>
+                        <td>每轮改什么</td>
+                        <td>想到哪改到哪</td>
+                        <td>拆成固定维度，一轮聚焦一个</td>
+                    </tr>
+                    <tr>
+                        <td>改完怎么验证</td>
+                        <td>看着顺眼就算过</td>
+                        <td>复审 + 实测双重验证</td>
+                    </tr>
+                    <tr>
+                        <td>犯过的错怎么办</td>
+                        <td>下次可能还会再犯一遍</td>
+                        <td>根因分析后沉淀成经验库，下次直接避开</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>放进本站坐标系里，Loop Engineering 这次不是引入新的对照关系，而是<strong>把前面四篇里已经埋下的线头收回来</strong>：</p>
+            <ul>
+                <li><strong>× Agent</strong>　agent.html 的消融实验——一次只改一个变量，对比成功率和 Token 消耗——是 Loop Engineering 最早在本系列里出现的样子。</li>
+                <li><strong>× Skill</strong>　skill-creator 这类工具本身就遵循"写草稿 → 测试 → 评估 → 迭代"的闭环，Skill 的质量是被"跑出来"的，不是一次写对的。</li>
+                <li><strong>× Harness Engineering</strong>　harness-engineering.html 里"换模型就做一次拆解测试"，逐个组件拿掉看结果——这是 Loop Engineering 在 Harness 维护上的具体打法。</li>
+                <li><strong>× Context Engineering</strong>　上下文该压缩多少、什么时候重置，没有放之四海皆准的公式，只能靠"改一版策略、跑一轮、看指标"逐步逼近。</li>
+                <li><strong>× Prompt Engineering</strong>　prompt-engineering.html 那句"你今天的解药，可能是明天的镣铐"，说的就是 Prompt 技巧本身也需要被纳入这套迭代闭环，跟着模型一起"发育"。</li>
+            </ul>
+
+            <!-- ========== 三、拆解：RELOO ========== -->
+            <h2 id="zujian">三、拆解：一个真实落地的 Loop Engineering 系统</h2>
+            <p>光讲方法论容易流于空谈，这里直接上一个真实案例——我自己写的开源项目 <a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">RELOO</a>，一套面向 AI 编程助手的 Skill 与 Rules 配置体系，专门解决"AI 改代码时容易凭感觉一把梭——方向发散、遗漏边界、修复不验证"这个问题。</p>
+            <p>RELOO 这个名字本身就是 Loop Engineering 的缩写：<strong>R</strong>eview、<strong>E</strong>valuate、<strong>L</strong>oop、<strong>O</strong>ptimize、<strong>O</strong>rchestrator（审查-评估-循环-优化-编排器）。核心流程是一条八步闭环：</p>
+            <pre><code>审查现状 → 写提示词 → 迭代修复 → 规范复审 → 实测验证 → 根因分析 → 经验沉淀 → 下一轮</code></pre>
+            <p>每一轮不是漫无目的地"再改改看"，而是聚焦一个固定维度，六轮跑完一整个矩阵：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>轮次</th>
+                        <th>维度</th>
+                        <th>检查重点</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>R1</td><td>核心逻辑正确性</td><td>算法、公式来源、边界值覆盖</td></tr>
+                    <tr><td>R2</td><td>状态管理与持久化</td><td>数据跨会话 / 跨操作丢失、编辑态回退</td></tr>
+                    <tr><td>R3</td><td>交互一致性</td><td>事件冒泡、按钮重复触发、输入失焦</td></tr>
+                    <tr><td>R4</td><td>UI 一致性与边界</td><td>视觉一致性、空状态、极端数据展示</td></tr>
+                    <tr><td>R5</td><td>性能与可访问性</td><td>局部更新 vs 整页重渲染、CSS 变量有效性</td></tr>
+                    <tr><td>R6</td><td>极端边界场景</td><td>跨年跨月、超大数据量、零值负值</td></tr>
+                </tbody>
+            </table>
+            <p><strong>终止条件</strong>写得很干脆：连续一轮未发现新问题，或者六个维度已全部扫描完毕，就停——不靠感觉判断"应该差不多了"。</p>
+            <p>更值得拿出来说的是，这条闭环不是一个 Skill 单打独斗，而是<strong>五个 Skill 联动</strong>，本身就是本系列前面几篇概念的一次小型汇演：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Skill</th>
+                        <th>负责什么</th>
+                        <th>对应本系列概念</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>loop-engineering</td>
+                        <td>总调度器，编排六轮迭代和联动顺序</td>
+                        <td>本文主角</td>
+                    </tr>
+                    <tr>
+                        <td>prompt-writing</td>
+                        <td>每轮开始前设计"角色-任务-规则-示例-异常"五层结构 Prompt</td>
+                        <td>Prompt Engineering</td>
+                    </tr>
+                    <tr>
+                        <td>coding-standards</td>
+                        <td>修复后复查代码是否合规</td>
+                        <td>Harness Engineering（验证回路）</td>
+                    </tr>
+                    <tr>
+                        <td>self-introspection</td>
+                        <td>用五问法（5-Whys）追溯每个 Bug 的根因，沉淀到经验库</td>
+                        <td>Context Engineering（外部记忆）</td>
+                    </tr>
+                    <tr>
+                        <td>content-reviewing</td>
+                        <td>审查修复报告的准确性、逻辑性、完整性</td>
+                        <td>Harness Engineering（评估者）</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>"经验沉淀"这一步尤其值得展开：每轮发现的 Bug 模式，会被五问法根因分析后写进 <code>project_memory.md</code>，成为一份持续增长的模式库——这样下一次遇到类似问题，AI 不用再从零踩一遍坑。这跟 harness-engineering.html 里"把状态写进外部文件而不是靠记性"是同一个思路，只是这次沉淀的不是任务进度，而是<strong>踩过的坑本身</strong>。</p>
+
+            <!-- ========== 四、实战避坑 ========== -->
+            <h2 id="shizhan">四、实战避坑：两个"血泪翻车现场"</h2>
+
+            <h3>坑一：没有终止条件，AI 陷入无意义的反复修改</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>让 AI"多检查几遍代码"，结果它在同一批代码里来回改，改了又改，有些改动甚至是把上一轮改对的地方又改回去了——没人说得清这个循环什么时候该停。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>"多检查几遍"是个没有边界的指令。没有清晰的维度划分和终止条件，循环要么提前草草收场，要么陷入原地打转。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>像 RELOO 那样，把"审查"拆成几个互不重叠的固定维度，每轮只聚焦一个；终止条件写清楚——连续一轮没有新发现，或者所有维度都跑完了，就是停止信号。</p>
+            <blockquote>� <strong>没有终止条件的循环不是迭代，是原地打转。</strong></blockquote>
+
+            <h3>坑二：只顾"改"，不顾"沉淀"——同一个坑反复踩</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>这一次改代码，AI 漂亮地修复了一个边界值 Bug；下一次改另一个功能，同样类型的边界值 Bug 又出现了——因为上一次的教训从来没有被记录下来，AI 每次都是"失忆"状态重新开始。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>迭代闭环如果只有"发现问题 → 修复问题"，没有"归纳问题模式 → 写进可复用的经验库"这一环，每一轮的收获都是一次性的，用完就丢。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>加一步根因分析和经验沉淀——RELOO 用五问法把每个 Bug 刨到根子上，归纳成模式写进 <code>project_memory.md</code>。下次遇到同类场景，AI 能直接查到"这类问题以前怎么破的"，而不是重新踩一遍。</p>
+            <blockquote>💡 <strong>不沉淀经验的循环，本质上是在原地重复劳动，只是看起来像是在进步。</strong></blockquote>
+
+            <!-- ========== 五、怎么设计 ========== -->
+            <h2 id="jueze">五、进阶：想设计自己的 Loop，从哪几步入手</h2>
+            <ul>
+                <li><strong>把"检查"拆成互不重叠的固定维度</strong>——像 RELOO 的六轮矩阵那样，每轮只盯一件事，别指望一轮就把所有问题挑完</li>
+                <li><strong>写清楚终止条件</strong>——不是"改到满意为止"，而是一个可判断的信号：连续几轮无新发现、还是固定轮数跑完</li>
+                <li><strong>验证要独立于修复</strong>——复审和实测分开进行，别让"改代码的人"自己说了算（这一条和 harness-engineering.html 里生成者-评估者分离是同一个道理）</li>
+                <li><strong>加一环根因分析和经验沉淀</strong>——发现问题只是及格线，把问题模式提炼出来写进一份持续增长的记录，才是真正的复利</li>
+            </ul>
+
+            <!-- ========== 六、结语 ========== -->
+            <h2 id="jieyu">六、结语：六篇文章，其实讲的是同一件事的六个侧面</h2>
+            <p><strong>给小白的话</strong>：一个 AI 产品用起来靠谱，从来不是因为它"聪明"，而是因为背后有人把"怎么让它靠谱"这件事拆成了六块——给它手脚（Agent）、给它专业知识（Skill）、给它安全带（Harness Engineering）、给它一张干净的工作台（Context Engineering）、给它写清楚的说明书（Prompt Engineering）、给它一套知道什么时候该停、该记什么教训的复盘机制（Loop Engineering）。少了任何一块，前面几块做得再好也白搭。</p>
+            <p><strong>给开发者的话</strong>：如果你从 Agent 这篇一路读到这里，会发现很多"金句"其实在反复被引用——"上下文是工作台不是仓库"、"今天的解药可能是明天的镣铐"、"别让运动员自己当裁判"。这不是巧合，是因为这六个概念本来就不是六个孤立的知识点，是<strong>同一套工程体系从六个角度看过去的样子</strong>。真正上手做一个 Agent 项目时，你会同时用到全部六种手艺，而不是挑一种就够。</p>
+            <blockquote>💡 <strong>Loop Engineering 教会我们的最后一件事是：这篇文章本身也不会是终点——工程实践永远在下一轮迭代里。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：<a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">kipozannaki/RELOO</a> —— AI 驱动的多轮代码迭代自审工程框架（MIT 协议开源）</p>
+
+            <!-- 跨文章导航：上一站 Prompt Engineering / 下一站 回到起点 Agent -->
             <nav class="article-nav">
                 <a href="prompt-engineering.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -35,6 +183,13 @@
                         <span class="nav-label">上一站</span>
                         <span class="nav-title">✍️ Prompt Engineering</span>
                     </span>
+                </a>
+                <a href="agent.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">回到起点，再读一轮</span>
+                        <span class="nav-title">🧠 Agent</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
                 </a>
             </nav>
 
