@@ -181,3 +181,57 @@ a:hover { color: var(--primary-dark); }
     margin-top: 60px;
 }
 .site-footer a { color: var(--primary); }
+
+/* ============================================
+   文章内容排版（h2/h3/p/ul/ol/pre/code/blockquote）
+   - 标题下加细分隔线，建立层次
+   - 行高 1.8 更易阅读
+   ============================================ */
+.article-body h2 {
+    font-size: 1.5rem;
+    margin: 32px 0 16px;
+    color: var(--text);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+}
+.article-body h3 {
+    font-size: 1.2rem;
+    margin: 24px 0 12px;
+    color: var(--text);
+}
+.article-body p {
+    margin-bottom: 16px;
+    color: var(--text);
+    line-height: 1.8;
+}
+.article-body ul, .article-body ol {
+    margin: 0 0 20px 24px;
+    color: var(--text);
+}
+.article-body li { margin-bottom: 8px; line-height: 1.7; }
+.article-body pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+.article-body code { font-family: 'Fira Code', 'Consolas', monospace; }
+.article-body p code, .article-body li code {
+    background: var(--bg);
+    color: #c7254e;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.article-body blockquote {
+    margin: 16px 0;
+    padding: 12px 20px;
+    border-left: 4px solid var(--primary);
+    background: var(--bg);
+    color: var(--text-light);
+    border-radius: 0 8px 8px 0;
+}
