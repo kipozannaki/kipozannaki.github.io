@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!-- 文章页：Embedding — Foundation & Core Algorithms 专题第二篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedding · kipozannaki</title>
+    <meta name="description" content="为什么换个 Embedding 模型 RAG 检索全崩、「国王-男人+女人≈女王」为什么复现不出来？一篇讲清向量空间的世界。">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>📐 Embedding：为什么「国王－男人＋女人≈女王」是个陷阱？</h1>
+            <p class="meta">为什么换个模型 RAG 检索全崩、相似度分数到底能不能信？一篇讲清向量空间的世界 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能直接用 Token ID</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#shizhan">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <!-- ========== 0、引言 ========== -->
+            <h2 id="intro">零、引言：「Embedding 不就是把字变成数字吗？」</h2>
+            <p>先扔几个问题，看你中过几个：</p>
+            <ul>
+                <li>为什么换了一个 Embedding 模型，RAG 检索直接全崩，明明文档一个字都没改？</li>
+                <li>为什么「国王－男人＋女人≈女王」这个流传十几年的经典例子，你自己动手试，十有八九算不出「女王」？</li>
+                <li>为什么两句话余弦相似度是 0.82，到底算相似还是不相似，没人说得清？</li>
+                <li>为什么中文语料训练出来的 Embedding 模型，搜英文文档直接搜不到，明明内容高度相关？</li>
+                <li>为什么向量数据库突然报错「维度不匹配」，你的文档明明一个字都没变？</li>
+            </ul>
+            <p>这五个问题看起来分别是工程事故、科普翻车、玄学阈值、跨语言 bug、数据库报错——但<strong>根子都在同一个地方</strong>。</p>
+            <p>答案是：Token 只是给每个字一个编号，编号本身没有意义；<strong>Embedding 才是第一次让模型知道，「国王」和「女王」要比「国王」和「香蕉」离得更近</strong>。这一步没做好，后面所有依赖「语义相似」的环节——检索、排序、记忆、多模态——全部会跟着塌。</p>
+            <blockquote>💡 <strong>Tokenization 决定文字怎么被切开。Embedding 决定切出来的每一块，在模型眼里「长在哪儿」。</strong></blockquote>
+
+            <!-- ========== 1、坐标 ========== -->
+            <h2 id="zuobiao">一、Embedding 在 AI 世界里的坐标</h2>
+            <p>紧接上一篇 Tokenization 的管线图，往下走一步：</p>
+            <pre><code>Human Language（你输入的文字）
+    ↓
+Tokenizer（把文字切成 Token）
+    ↓
+Token ID（一串孤立的数字编号）
+    ↓
+Embedding（把编号映射成有几何关系的向量）  ← 本篇
+    ↓
+Transformer（在向量空间里做注意力运算）
+    ↓
+Inference（逐 Token 预测下一个 Token）
+    ↓
+LLM 输出</code></pre>
+            <p>Token ID 只是编号，17421 和 17422 之间没有任何数学意义上的接近——完全可能一个是「猫」，一个是「航空母舰」。Embedding 要做的事，就是把这些孤立的编号，重新安放进一个几百到上万维的空间里，让<strong>意思相近的词，位置也相近</strong>。</p>
+            <p>这一步的影响，同样会渗透到整个工程体系里：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 Embedding 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>RAG Engineering</td><td>检索的本质就是比较 query 和 chunk 的向量距离，选错 Embedding 模型，整条检索链路都作废</td></tr>
+                    <tr><td>Context Engineering</td><td>语义去重、相关性排序，打分依据都是 Embedding 相似度</td></tr>
+                    <tr><td>Prompt Engineering</td><td>Few-shot 示例的自动挑选，常靠 Embedding 相似度找「最像」的例子</td></tr>
+                    <tr><td>Agent</td><td>语义记忆（想起「相关的」历史，而不是「最近的」历史）靠 Embedding 支撑</td></tr>
+                    <tr><td>多模态</td><td>图片 Patch 最终也会变成向量——只有和文字活在同一个空间里，才能「图文互搜」</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>Tokenization 决定模型看到了什么。Embedding 决定模型觉得，什么跟什么「像」。</strong></blockquote>
+
+            <!-- ========== 2、为什么不能直接用 Token ID ========== -->
+            <h2 id="why">二、为什么不能直接拿 Token ID 当输入？</h2>
+            <p>一个直觉的问题：Token ID 已经是数字了，为什么不能直接丢给模型算？</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>直接用 Token ID 当数值</td>
+                        <td>17421 就是数字 17421</td>
+                        <td>编号的大小顺序毫无意义——17421 和 17422 数值上「挨着」，语义上可能毫不相关</td>
+                    </tr>
+                    <tr>
+                        <td>One-hot 编码</td>
+                        <td>每个 Token 一个只有一位是 1 的超长向量</td>
+                        <td>词表十万个 Token，向量就要十万维；而且任意两个 Token 之间的「距离」完全相等——猫和狗、猫和航空母舰，在这个空间里一样「远」</td>
+                    </tr>
+                    <tr>
+                        <td>人工打标签</td>
+                        <td>人工标注词性/语义类别</td>
+                        <td>人力成本不可能覆盖全部语言现象，更没法覆盖新词和跨语言的相似性</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>三条路都走不通，最终收敛到的方案是：<strong>用一段从数据里自动学出来的稠密向量，代替人工规则</strong>。</p>
+            <blockquote>💡 <strong>Embedding 不是「设计」出来的，是「训练」出来的——没有人规定「国王」该长什么样，是海量文本里的共现规律，自己把它推到了那个位置。</strong></blockquote>
+
+            <!-- ========== 3、怎么工作的 ========== -->
+            <h2 id="how">三、Embedding 到底是怎么工作的？</h2>
+            <p>不讲公式，讲直觉。</p>
+            <p>每个 Token 一开始被随机初始化成一个高维向量，然后在海量文本上反复调整——核心任务通常是「预测上下文」：如果两个词经常出现在相似的语境里，它们的向量就会被训练得越来越靠近。这背后的假设很朴素：<strong>一个词的意思，很大程度上由它周围经常出现哪些词决定</strong>。</p>
+            <p>「国王」和「女王」经常一起出现在加冕、宫殿、统治这类语境里，向量会越训越近；「国王」和「香蕉」几乎不会共享语境，向量自然相距很远。整个过程跟 Tokenizer 学 BPE 合并规则一样——没有人工语义标注，纯粹是统计规律的产物。</p>
+            <p><strong>这里有一个经常被混为一谈的关键区分</strong>：</p>
+            <ul>
+                <li><strong>Token Embedding</strong>：LLM 内部的第一层，逐 Token 映射，向量会随着后续 Attention 层不断根据上下文调整，不直接暴露给开发者调用。</li>
+                <li><strong>文本/句子 Embedding 模型</strong>：专门为检索、语义搜索训练的独立模型（比如常见的向量检索服务用的那一类），输入一整段文字，输出一个代表整段意思的向量——这才是做 RAG 的人实际会调用的东西。</li>
+            </ul>
+            <p>两者同名不同物，但经常被当成一回事讨论，这也是后面很多「翻车现场」的源头。</p>
+            <blockquote>💡 <strong>模型内部的 Embedding 层，和你在 RAG 里调用的 Embedding 模型，是两个长得像但不是一回事的东西——搞混了，排查 bug 时会南辕北辙。</strong></blockquote>
+
+            <!-- ========== 4、怎么影响能力 ========== -->
+            <h2 id="impact">四、Embedding 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+
+            <h3>为什么换个 Embedding 模型，RAG 检索直接全崩？</h3>
+            <p><strong>翻车现场</strong>：把 Embedding 模型从 A 换成 B，知识库文档一个字都没动，检索结果却全成了不相关内容。</p>
+            <p><strong>根因</strong>：不同 Embedding 模型的向量空间是互不兼容的坐标系——A 模型觉得「很近」的两个点，换到 B 模型的坐标系里可能完全对不上号。换模型之后如果没有对整个向量库做 reindex（重新生成向量），新查询产生的向量和库里的旧向量根本不在同一个空间里，算出来的相似度分数没有任何意义。</p>
+            <blockquote>💡 <strong>换 Embedding 模型，等于把整个地图换了一套坐标系——旧地图上的坐标，拿到新地图上直接失效。</strong></blockquote>
+
+            <h3>为什么「国王－男人＋女人≈女王」复现不出来？</h3>
+            <p><strong>翻车现场</strong>：这个例子在科普文章和讲座里流传了十几年，你自己拿现代大模型的 Embedding 一试，往往算不出「女王」，反而是一堆不相关的词。</p>
+            <p><strong>根因</strong>：这个例子最早来自训练方式相对简单、维度较低的早期词向量模型，在那种特定训练目标下，向量空间确实呈现出比较干净的线性代数关系。现代 Embedding 模型维度更高、训练目标更复杂（考虑上下文、融合多任务目标），向量空间的结构不再是那种可以「减一下就精确算出来」的程度——类比关系依然存在，但不再具备生产环境能依赖的精确性。</p>
+
+            <h3>为什么中文 Embedding 模型搜不到英文文档？</h3>
+            <p><strong>翻车现场</strong>：知识库里中英文文档混杂，用户用中文提问，明明有高度相关的英文文档，检索结果里却完全没被召回。</p>
+            <p><strong>根因</strong>：不是所有 Embedding 模型都天然支持跨语言对齐。如果训练数据里没有显式对齐过「意思相同的中英文句子，向量要靠近」这个目标，模型学到的中文和英文可能活在向量空间里两个几乎不重叠的区域——不是检索算法出了 bug，是一开始就选错了模型。</p>
+            <blockquote>💡 <strong>检索召回率低，第一反应不该是调 Prompt 或者换检索算法，先去查一下：你的 Embedding 模型，到底认不认识你要搜的那种语言/领域。</strong></blockquote>
+
+            <!-- ========== 5、为什么开发者要懂 ========== -->
+            <h2 id="engineering">五、为什么开发者一定要懂 Embedding？</h2>
+            <p>这一章把 Embedding 接回整个工程体系。</p>
+            <p><strong>RAG Engineering</strong>：检索质量的天花板由 Embedding 模型的语义对齐能力决定——这是地基，不是靠优化 Prompt 或调整 Chunk 大小能弥补的。选错模型，后面所有工程手艺都是在给一个漏水的桶打补丁。</p>
+            <p><strong>Context Engineering</strong>：语义相关性排序、去重压缩，打分机制的底层都是 Embedding 相似度在跑。</p>
+            <p><strong>Prompt Engineering</strong>：动态挑选 Few-shot 示例时，常见做法是拿 Embedding 相似度去检索「最像当前问题」的历史案例。</p>
+            <p><strong>Agent</strong>：语义记忆——让 Agent「想起相关的事」而不是「想起最近的事」——靠的正是 Embedding 检索。</p>
+            <p><strong>往下一篇埋个伏笔</strong>：Embedding 给出的只是一个「静态起点」，同一个词在不同语境里应该有不同的含义（「苹果」在「吃苹果」和「苹果公司」里显然不该是同一个向量）——真正让向量根据上下文动态调整的，是下一层的 Attention 机制，我们放到下一篇细讲。</p>
+
+            <!-- ========== 6、常见误区 ========== -->
+            <h2 id="shizhan">六、常见误区（翻车现场）</h2>
+
+            <h3>误区一：相似度分数可以跨模型比较</h3>
+            <p><strong>真相</strong>：0.8 在 A 模型里的意义，和 0.8 在 B 模型里的意义完全不同。相似度阈值必须针对具体模型和场景单独校准，不能套用一个全局「及格线」。</p>
+
+            <h3>误区二：换个更大的模型，Embedding 效果一定更好</h3>
+            <p><strong>真相</strong>：效果好坏取决于训练数据和目标是否匹配你的场景——一个专门针对法律文本训练的小模型，在法律检索任务上完全可能碾压一个参数量大十倍的通用模型。</p>
+
+            <h3>误区三：Embedding 生成一次，永久有效</h3>
+            <p><strong>真相</strong>：换模型版本、换训练语料，向量空间就变了，旧向量必须重新生成，不能直接沿用——这也是「换模型 RAG 全崩」的根本原因。</p>
+
+            <h3>误区四：语义相似 ＝ 事实正确/立场一致</h3>
+            <p><strong>真相</strong>：Embedding 只捕捉「经常出现在相似语境」这种统计层面的接近，不代表内容真实或逻辑一致。「这个产品好用」和「这个产品难用」因为在讨论同一个话题，向量距离不一定像语义对立那样被拉开。</p>
+
+            <h3>误区五：Tokenization 切得好不好，跟 Embedding 质量没关系</h3>
+            <p><strong>真相</strong>：Tokenization 是 Embedding 的地基。分词切得支离破碎，Embedding 学到的向量表示质量也会跟着下降——这也是为什么这两篇要连起来看。</p>
+            <blockquote>💡 <strong>相似度分数是一把只在同一个模型、同一个场景里才准的尺子。换了模型、换了场景，尺子本身就变了，不能拿旧刻度量新东西。</strong></blockquote>
+
+            <!-- ========== 7、总结 ========== -->
+            <h2 id="jieyu">七、总结：文字属于人类，向量属于模型</h2>
+            <p><strong>给小白的话</strong>：下次遇到「搜索结果文不对题」，别急着怪 AI 笨——很可能是负责「理解相似」的那一层，从一开始就没认对语言，或者干脆换了模型没重新生成向量。</p>
+            <p><strong>给开发者的话</strong>：Embedding 不是接一个 API、拿到一串数字就完事的黑盒。它决定了 RAG 的检索质量上限，决定了语义记忆能不能「想起相关的事」，决定了跨语言、跨模型场景下你的相似度分数还能不能相信。Tokenization 解决了「怎么切」，Embedding 解决了「切出来的东西到底是什么意思」——这两层没打牢，上面 Application 专题讲的所有检索、排序、压缩手艺，都是在流沙上盖房子。</p>
+            <blockquote>💡 <strong>Token 让文字有了编号。Embedding 让编号有了意义。理解 Embedding，就是理解模型第一次「觉得两件事很像」是怎么发生的。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：分布式语义假设（Distributional Hypothesis）相关经典研究；word2vec 原始论文（Mikolov et al.）；Sentence-BERT 相关工作</p>
+
+            <!-- 跨文章导航：Foundation 专题第二篇，上一篇 tokenization，下一篇 attention（内容建设中） -->
+            <nav class="article-nav">
+                <a href="tokenization.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🪙 Tokenization</span>
+                    </span>
+                </a>
+                <a href="foundation.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一篇（内容建设中）</span>
+                        <span class="nav-title">🧠 Attention / Transformer</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
