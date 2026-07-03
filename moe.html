@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!-- 文章页：MoE — Foundation & Core Algorithms 专题第七篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoE · kipozannaki</title>
+    <meta name="description" content="为什么现在的模型要分「参数量」和「激活参数量」两个数？为什么 MoE 省了算力却没省显存？一篇讲清混合专家模型到底在搞什么。">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) {}
+    })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧩 MoE：参数量这个数字，为什么开始变得「不诚实」了？</h1>
+            <p class="meta">为什么现在的模型要分两个参数量讲？为什么 MoE 省了算力没省显存？一篇讲清混合专家 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能继续堆稠密模型</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <h2 id="intro">零、引言：参数量开始变成「宣传文案」了</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么现在主流大模型都要分「参数量」和「激活参数量」两个数来讲？</li>
+                <li>为什么有的模型号称「千亿参数」，但实际推理速度和参数量小一个量级的稠密模型差不多？</li>
+                <li>为什么 MoE 模型省了算力，却没省多少显存，部署起来还是贵得离谱？</li>
+                <li>「专家」到底是个什么东西，跟人类意义上的专家是一回事吗？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>MoE（Mixture of Experts，混合专家）</strong>这个最近两年几乎所有旗舰模型都绕不开的架构选择里。前面 Inference 那篇讲过「对话越聊越卡」的物理约束；本篇要讲的，是模型架构本身为了绕开另一个硬约束——「参数越多，推理越贵」——而做的核心取舍。</p>
+            <blockquote>💡 <strong>参数量这个数字，从 MoE 开始变得越来越像一个「总藏书量」的宣传文案，而不是「每次回答你时实际翻动过的页数」——理解这一点，才能看懂现在大模型参数表的真正含义。</strong></blockquote>
+
+            <h2 id="zuobiao">一、MoE 在 AI 世界里的坐标</h2>
+            <p>紧接 Inference 管线往前走：</p>
+            <pre><code>Tokenizer → Embedding → Attention / Transformer → Pretraining → Alignment
+    ↓
+模型架构选型：稠密 Transformer（Dense）vs 混合专家（MoE）  ← 本篇
+    ↓
+Inference（部署上线，逐 Token 预测）</code></pre>
+            <p>这一层的影响会渗透到整个工程体系里：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 MoE 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>推理优化（Topic③）</td><td>MoE 的显存占用是密集型问题，KV Cache 管理、专家并行（Expert Parallelism）这些工程手段都是直接针对 MoE 的显存挑战的</td></tr>
+                    <tr><td>模型选型</td><td>选模型不能只看参数量这一个数字，要分清「总参数量」和「激活参数量」——同样是 100B，前者跑得动，后者实际跑的量级完全不同</td></tr>
+                    <tr><td>部署成本评估</td><td>MoE 模型「参数量大但推理相对便宜」是双刃剑——省钱在算力，贵在显存，这个权衡直接影响部署硬件选择</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>稠密模型是一个会全部技能的全能型选手，MoE 是一群各有所长的专家每次挑几个上场——两种模式各有代价，看的是你要「全靠一个人的记忆」还是「靠一支队伍的协作」。</strong></blockquote>
+
+            <h2 id="why">二、为什么不能继续把稠密模型越做越大？</h2>
+            <p>在过去几年里，主流厂商普遍走过一条「把稠密模型参数堆到越来越大」的路，直到撞上两个绕不开的墙：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>稠密模型直接堆参数</td>
+                        <td>每处理一个 Token，都要激活全部参数参与计算</td>
+                        <td>计算成本和显存开销随参数量同步增长，单纯靠堆参数扩大模型能力，边际收益快速递减</td>
+                    </tr>
+                    <tr>
+                        <td>靠更聪明的算法代替堆参数</td>
+                        <td>优化训练数据、改进训练策略，不靠参数规模换能力</td>
+                        <td>只能延缓问题，不能从根本上解决「能力上线依赖参数规模」这一规律</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>MoE 给出的第三条路是：<strong>把模型做大，但不把「每次推理」也做那么大</strong>。参数总量上去，但每次只激活其中一小部分实际参与计算——「总藏书量」上去了，「每次实际翻的页数」没同比上涨。</p>
+            <blockquote>💡 <strong>稠密模型越大越聪明，但也越大越贵——MoE 的核心想法是「聪明可以涨，贵不一定要同步涨」。</strong></blockquote>
+
+            <h2 id="how">三、MoE 到底是怎么工作的？</h2>
+            <p>核心机制用一个直觉类比：</p>
+            <p>把传统稠密模型里的某一层，换成 <strong>N 个并行的「专家」子网络</strong>（每个专家本身是一个相对独立的小网络），再加一个 <strong>路由器（Router / Gating Network）</strong>。每进来一个 Token，路由器先快速判断「这个 Token 适合哪几个专家」，然后只把那几位专家激活处理这个 Token，其他专家完全不参与这次计算——最后的输出是这几个被激活专家的结果加权组合。</p>
+            <p>几个关键设计：</p>
+            <ul>
+                <li><strong>专家数量 N</strong>：常见的 MoE 模型会用 8 个、16 个甚至几十上百个专家，远多于每次激活的数量。</li>
+                <li><strong>Top-K 路由</strong>：路由器一般只挑分数最高的前 K 个专家（K 通常是 1 或 2）来激活，剩下的专家完全不参与这次计算——这就是「总参数大、激活参数小」的具体机制。</li>
+                <li><strong>负载均衡（Load Balancing）</strong>：一个棘手的问题是，路由器可能偷懒把多数 Token 都分配给同一两个「热门」专家，其他专家闲置浪费——所以训练时通常会加一个额外的辅助损失项，惩罚这种不均衡，强制路由器让各个专家尽量被均匀使用。</li>
+            </ul>
+            <p>这整套机制让模型「名义上」拥有很大容量的参数库（学到了更多不同类型的知识），但「实际上」每次只算其中一小部分——同时保住了大容量带来的表达能力和小计算量带来的推理效率。</p>
+            <blockquote>💡 <strong>MoE 不是「模型变聪明了」的天才发明，是「在容量和成本之间找了一个折中点」的工程妥协——它没有消除成本问题，只是把成本从「算力」挪了一部分到「显存」上。</strong></blockquote>
+
+            <h2 id="impact">四、MoE 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+
+            <h3>为什么 MoE 模型省了算力，却没省多少显存？</h3>
+            <p><strong>翻车现场</strong>：选了一个号称「千亿参数」的 MoE 模型部署，本以为推理会便宜很多，结果实际用起来发现硬件成本主要是被显存吃掉，模型加载之后 GPU 显存几乎被占满。</p>
+            <p><strong>根因</strong>：MoE 是「参数总量大但每次只激活一部分」，但所有专家的参数都必须驻留在显存里，路由器才能随时调用——推理时虽然不是所有专家同时参与计算，但它们的参数一直在显存里待命。算力（每秒浮点运算次数）确实省了，但显存（容纳所有专家参数 + KV Cache + 激活中间结果）几乎没省，这是 MoE 模型部署时一个常被低估的隐性成本。</p>
+
+            <h3>为什么 MoE 模型的延迟表现，有时候反而不稳定？</h3>
+            <p><strong>翻车现场</strong>：用同一个 MoE 模型跑一批请求，发现有的请求响应很快，有的明显比预期慢——延迟分布没有稠密模型那么稳定。</p>
+            <p><strong>根因</strong>：不同 Token 被路由器分配到的专家组合不一样，激活路径长度也有差异，再叠加专家在 GPU 上的物理分布（不同专家可能驻留在不同卡上，需要跨卡通信），所以单次请求的延迟波动会比稠密模型大。生产环境通常会用专家并行（Expert Parallelism）配合各种调度策略来缓解这个问题，但根子上的不均匀性并不会完全消失。</p>
+
+            <h3>为什么 MoE 模型在某些需要稳定记忆的知识上表现反而不稳定？</h3>
+            <p><strong>翻车现场</strong>：用 MoE 模型做需要稳定记忆某些事实的测试，发现同一类问题问法稍变一下，答案可能大相径庭——不像稠密模型那么稳定。</p>
+            <p><strong>根因</strong>：不同专家学到的知识有偏重，而路由器对不同问法的分配又不一样，同一类知识可能分散在不同的专家里、被不同路径激活，这种「知识分散在不同专家子网里」的特性，是用「不把所有知识集中在每个 Token 都经过的稠密路径」的代价换来的——这就是 MoE 架构本身的固有特性，不是工程实现问题。</p>
+            <blockquote>💡 <strong>MoE 没有「免费的午餐」——它确实在算力维度上做了优化，但代价是显存占用和延迟稳定性方面的新挑战，部署时不能只看宣传参数就拍板。</strong></blockquote>
+
+            <h2 id="engineering">五、为什么开发者一定要懂 MoE？</h2>
+            <p><strong>模型选型</strong>：选模型时不能只看「参数量」这个单数字，要分清「总参数量」和「激活参数量」——同样是 100B 参数量，MoE 模型可能只激活 12B（计算量跟 12B 稠密模型相当），稠密模型则每次都激活 100B，两者的部署成本和实际速度差出将近一个量级。</p>
+            <p><strong>Topic③ 推理优化</strong>：MoE 模型的显存管理比稠密模型复杂得多，专家并行（Expert Parallelism）、专家调度、负载均衡这些工程手段都是直接针对 MoE 的显存挑战——理解了 MoE 的工作原理，才知道这些优化技术到底在解决什么。</p>
+            <p><strong>部署成本评估</strong>：MoE 的「便宜」是算力维度的便宜，显存维度反而可能更贵——选硬件、估成本时不能简单按「参数量 ÷ 单卡显存」去计算，需要把专家驻留、KV Cache、激活中间结果全算进去。</p>
+            <p><strong>往下一篇的伏笔</strong>：MoE 让模型参数库可以「越做越大，但每次算的量不一定要同步涨」——下一篇 Long Context 要讲的，是怎么把「一次能喂给模型的输入长度」也做大，做法上跟 MoE 一样，都是在「容量上去了，成本必须可控」这条约束下做权衡。</p>
+
+            <h2 id="wuqu">六、常见误区</h2>
+
+            <h3>误区一：MoE 模型比稠密模型更「强」</h3>
+            <p><strong>真相</strong>：MoE 是在「容量大 + 每次算量小」之间找折中，不是无代价的更强。能力上限受限于专家容量和路由质量，显存占用甚至更高，部署时未必更省钱。</p>
+
+            <h3>误区二：MoE 模型的参数量，可以直接当成「模型大小」来比</h3>
+            <p><strong>真相</strong>：要看清楚是「总参数量」还是「激活参数量」——选模型、估成本时只看「千亿」这个数字，结论可能错得离谱。</p>
+
+            <h3>误区三：MoE 模型推理便宜，部署成本低</h3>
+            <p><strong>真相</strong>：算力维度的确便宜（因为激活量小），但显存维度的开销基本没省，部署硬件成本常常比同激活量的稠密模型还高。</p>
+
+            <h3>误区四：MoE 的「专家」就是模型里有专门的子网络学会了某个领域</h3>
+            <p><strong>真相</strong>：所谓「专家」是路由器分配出来的隐式分工，并不是人类意义上的领域专家。专家内部到底各自学到了什么、协作起来表现如何，路由器的训练质量起决定性作用，而不是事先按领域划分好的。</p>
+            <blockquote>💡 <strong>把 MoE 想成「一个能请到千亿参数大牛的团队，但每次只能让其中几个人出手」——团队规模的优势在「大」，但成本（维护整个团队的显存开销）也一直都在那。</strong></blockquote>
+
+            <h2 id="jieyu">七、总结：参数量的数字，是「藏书量」不是「阅读量」</h2>
+            <p><strong>给小白的话</strong>：下次看到一个模型标「千亿参数」，可以多问一句——这个千亿是真的每次回答你时全部参与计算，还是其实只有一小部分在工作。前者叫稠密模型，后者叫 MoE，两种模式的部署成本和实际速度差出近一个量级。</p>
+            <p><strong>给开发者的话</strong>：MoE 的核心是用「所有专家都驻留显存 + 每次只激活一小部分」这个折中，同时买到了大容量和相对小的计算量。理解这一点，才能看懂现在大模型参数表里那两个分开的数字、为什么 MoE 模型显存占用反而更高、为什么延迟有时不够稳定——这些都是这个折中方案的代价，不是哪个模型没做好的个别问题。</p>
+            <blockquote>💡 <strong>参数量从一个诚实的「每次实际参与计算的总和」，变成了一个模糊的「总藏书量」——理解这个转变，是看懂现代大模型架构选型的起点。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Shazeer et al. 关于稀疏门控混合专家层（Sparsely-Gated Mixture-of-Experts Layer）的相关研究；Fedus et al. 关于 Switch Transformer 的相关研究</p>
+
+            <nav class="article-nav">
+                <a href="inference.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">⚡ Inference</span>
+                    </span>
+                </a>
+                <a href="long-context.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一篇</span>
+                        <span class="nav-title">📏 Long Context</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
