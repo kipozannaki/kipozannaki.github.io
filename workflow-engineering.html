@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<!-- 文章页：Workflow Engineering 工业级落地（全新撰写：从步骤编排到可验收的协作系统） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Engineering 工业级落地 · kipozannaki</title>
+    <meta name="description" content="Workflow Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⚙️ Workflow Engineering 工业级落地</h1>
+            <p class="meta">从"步骤堆砌"到"可验收的协作系统" · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#plan">Plan</a> · <a href="#spec">Spec</a> · <a href="#zuobiao">坐标</a> · <a href="#moshi">设计模式</a> · <a href="#zhuangtai">状态管理</a> · <a href="#cuowu">错误处理</a> · <a href="#kuangjia">框架对比</a> · <a href="#shizhan">实战案例</a> · <a href="#xunhuan">与 Loop 的衔接</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
+            <h2 id="intro">一、引言：为什么 Workflow 不是"把几个步骤串起来"</h2>
+            <p>很多人对 Workflow 的理解停留在一张简单的流程图：<strong>步骤 A → 步骤 B → 步骤 C → 完成</strong>。结果上线后发现：步骤 B 的输出格式步骤 C 接不住、中间某步失败了不知道回退到哪、整个流程跑完了但结果根本不对。</p>
+            <p><strong>问题出在哪？</strong>这三个地方都可能：</p>
+            <ul>
+                <li><strong>Plan 没想清</strong>——步骤拆得太粗，一个步骤里塞了太多事；或者拆得太碎，步骤之间来回传数据，耦合得像 spaghetti</li>
+                <li><strong>Spec 没写明白</strong>——"步骤 B 处理数据"，处理成什么样算对？输出格式是什么？失败怎么办？没定义清楚，等于没定义</li>
+                <li><strong>状态没管好</strong>——步骤 A 改了全局变量，步骤 B 读了以为是对的，其实步骤 A 中途失败了没回滚，数据已经脏了</li>
+            </ul>
+            <p><strong>Workflow Engineering 干的事</strong>：从"怎么拆步骤"开始、经过"每一步的验收标准是什么"、"步骤之间怎么传数据"、"错了怎么回退"，设计一套<strong>从输入到输出的可验收协作系统</strong>。Workflow 不是一张流程图，而是一套有 Plan、有 Spec、有状态管理、有错误处理的工程规范。</p>
+            <blockquote>💡 <strong>Workflow 是"让多个步骤协作完成一件事"，但怎么拆、每一步做到什么程度算对、错了怎么修，每一步都需要设计。</strong></blockquote>
+
+            <!-- ========== 二、Plan ========== -->
+            <h2 id="plan">二、Plan：步骤序列的"拓扑图"</h2>
+            <p>Plan 回答的是：<strong>这件事需要分几步？哪些步骤可以并行？步骤之间的依赖关系是什么？</strong></p>
+            <p>Plan 不是"怎么做"，而是<strong>"有哪些步骤、什么顺序、什么依赖关系"</strong>。类比建筑，Plan 是<strong>平面图</strong>——需要几个房间、怎么连，而不是每个房间用什么材料。</p>
+
+            <h3>2.1 拆步骤的原则</h3>
+            <p><strong>原则一：一个步骤只做一件事</strong></p>
+            <p>反例："审查代码并生成修复建议并提交 PR"——这是三件事。拆成三个步骤：审查 → 生成建议 → 提交 PR。每个步骤的输入输出才清晰。</p>
+            <p><strong>原则二：步骤的边界由数据流决定</strong></p>
+            <p>什么时候该拆？看数据：如果步骤 A 的输出是步骤 B 的输入，且中间数据需要被验证，那就该拆。如果步骤 A 和步骤 B 共享同一份数据、没有明确的"交接点"，那可能不该拆。</p>
+            <p><strong>原则三：并行还是串行，看依赖不看直觉</strong></p>
+            <p>直觉上"先查数据再分析"是串行，但如果"查数据"可以拆成"查数据库"和"查缓存"两个独立操作，它们就可以并行。Plan 的关键是画出<strong>依赖图（DAG）</strong>，而不是时间线。</p>
+
+            <h3>2.2 Plan 的表示方式</h3>
+            <p>一个完整的 Plan 应该包含：</p>
+            <pre><code>Workflow: 代码审查自动化
+├── 步骤 1: 获取提交差异 (输入: commit SHA, 输出: diff)
+│   └── 依赖: 无
+├── 步骤 2: 静态分析 (输入: diff, 输出: 分析报告)
+│   └── 依赖: 步骤 1
+├── 步骤 3: 安全扫描 (输入: diff, 输出: 安全报告)
+│   └── 依赖: 步骤 1  (与步骤 2 并行)
+├── 步骤 4: 汇总结果 (输入: 分析报告 + 安全报告, 输出: 审查报告)
+│   └── 依赖: 步骤 2, 步骤 3
+└── 步骤 5: 提交评论 (输入: 审查报告, 输出: PR 评论)
+    └── 依赖: 步骤 4</code></pre>
+            <p>这个图里，步骤 2 和步骤 3 可以并行跑，因为它们都只依赖步骤 1。步骤 4 必须等两者都完成。这就是 Plan 的拓扑图。</p>
+
+            <!-- ========== 三、Spec ========== -->
+            <h2 id="spec">三、Spec：每个步骤的"验收标准"</h2>
+            <p>如果说 Plan 是"平面图"，Spec 就是<strong>"施工规范"</strong>——每个房间的尺寸标准、用什么材料、质检怎么验。</p>
+            <p>Spec 回答的是：<strong>这一步的输入是什么、输出是什么、算对了的标准是什么、错了怎么办。</strong></p>
+
+            <h3>3.1 整体 Workflow 的 Spec</h3>
+            <p>在具体步骤的 Spec 之前，先定义<strong>整个 Workflow 的输入输出和验收标准</strong>：</p>
+            <pre><code>【Workflow 整体 Spec】
+输入: GitHub 提交事件（commit SHA）
+输出: 审查报告（markdown）+ 是否允许合并（boolean）
+
+【整体验收标准】
+- 所有 3 个检查维度都必须完成（不能因为某个失败就跳过其他）
+- 报告必须在 10 分钟内生成
+- 如果有阻塞性问题，必须有"后续步骤"的建议
+
+【整体失败处理】
+- 某个检查超时 → 标记为"检查未完成"，不阻塞其他检查
+- 汇总阶段失败 → 回退到前一个 checkpoint，重新汇总
+- 整体超时 → 生成部分报告，标记为"超时中止"</code></pre>
+            <p>为什么要先写整体 Spec？因为如果没有整体的输入输出定义，每个步骤的 Spec 就会各自为政，最后拼起来发现对不上。</p>
+
+            <h3>3.2 单个步骤的 Spec 模板</h3>
+            <p>每个步骤都应该有清晰的 Spec：</p>
+            <pre><code>步骤 4: 汇总结果
+
+【输入】
+- 分析报告（JSON，含问题列表和严重程度）
+- 安全报告（JSON，含漏洞列表和风险等级）
+
+【输出】
+- 审查报告（Markdown，含摘要、详细问题、修复建议）
+- 是否阻塞合并（boolean）
+
+【验收标准】
+- 报告必须包含"摘要"、"详细问题"、"修复建议"三个部分
+- 阻塞性问题的判定标准：严重程度为"critical"或安全等级为"high"
+- 报告长度不超过 2000 字
+
+【失败处理】
+- 输入格式不对 → 尝试解析，解析失败则标记为"输入异常"
+- 生成报告超时（> 2 分钟）→ 输出简化版报告，标记"部分生成"
+- 输出不符合 schema → 重新生成一次，仍失败则人工介入</code></pre>
+            <p>关键：<strong>Spec 必须可验证</strong>。"输出一份好报告"不是 Spec，"报告必须包含三个部分、不超过 2000 字"才是。</p>
+
+            <h3>3.3 Plan 和 Spec 的关系</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Plan</th>
+                        <th>Spec</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>回答什么</td>
+                        <td>哪些步骤、什么顺序、什么依赖</td>
+                        <td>每一步的输入输出、验收标准、失败处理</td>
+                    </tr>
+                    <tr>
+                        <td>关键问题</td>
+                        <td>这件事需要分几步？</td>
+                        <td>怎么知道这一步做对了？</td>
+                    </tr>
+                    <tr>
+                        <td>建筑类比</td>
+                        <td>平面图（房间布局）</td>
+                        <td>施工规范（尺寸、材料、质检）</td>
+                    </tr>
+                    <tr>
+                        <td>改动成本</td>
+                        <td>改 Plan 可能重构整个流程</td>
+                        <td>改 Spec 只影响一个步骤</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- ========== 四、坐标 ========== -->
+            <h2 id="zuobiao">四、Workflow 在工程体系里的坐标</h2>
+            <p>Workflow 不是孤立的概念。它承上启下：上层被 Loop 调度，下层调用 Agent、Skill、RAG 等能力。</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>层级</th>
+                        <th>管什么</th>
+                        <th>与 Workflow 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Prompt</td>
+                        <td>单轮输入怎么写</td>
+                        <td>Workflow 的每个步骤都需要 Prompt 来告诉模型干什么</td>
+                    </tr>
+                    <tr>
+                        <td>Context</td>
+                        <td>单次会话里喂什么</td>
+                        <td>Workflow 的状态可能很大，Context 负责只喂必要信息</td>
+                    </tr>
+                    <tr>
+                        <td>RAG</td>
+                        <td>外部知识怎么接进来</td>
+                        <td>Workflow 步骤可能需要调用 RAG（如代码审查时查技术文档）</td>
+                    </tr>
+                    <tr>
+                        <td>Agent</td>
+                        <td>单个自主实体</td>
+                        <td>Workflow 的每个步骤通常是一个 Agent 或 Agent 的一次调用</td>
+                    </tr>
+                    <tr>
+                        <td>Skill</td>
+                        <td>打包可复用能力</td>
+                        <td>Workflow 可以把整个 Workflow 本身打包成一个 Skill 供 Agent 调用</td>
+                    </tr>
+                    <tr>
+                        <td>Harness</td>
+                        <td>单次 Agent 运行的环境</td>
+                        <td>Workflow 的每个步骤运行在 Harness 中</td>
+                    </tr>
+                    <tr>
+                        <td>Loop</td>
+                        <td>跨多次运行的调度</td>
+                        <td>Loop 触发/管理 Workflow 实例，Workflow 执行完后 Loop 判断是否重新触发</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Workflow 和本站其他概念的关系：</p>
+            <ul>
+                <li><strong>× Prompt Engineering</strong>　Workflow 的每个步骤都需要 Prompt，但 Workflow 不关心 Prompt 怎么写，只关心"这个步骤的 Prompt 输入输出是否符合 Spec"</li>
+                <li><strong>× Context Engineering</strong>　Workflow 可能产生大量中间状态，Context 负责"当前步骤只把必要信息塞进窗口"——两者协作防止上下文爆炸</li>
+                <li><strong>× RAG Engineering</strong>　Workflow 的步骤可能需要查询外部知识库。比如"代码审查 Workflow"的第 4 步（汇总结果）可能需要查"Python 最佳实践文档"来判断某个代码模式是否推荐。RAG 在这里是一个"可选的子步骤"</li>
+                <li><strong>× Agent</strong>　Workflow 的每个步骤通常是一个 Agent 的调用，但 Workflow 本身不决定 Agent 内部怎么推理——Workflow 只编排"什么时候调用哪个 Agent、传什么参数、怎么处理返回"</li>
+                <li><strong>× Harness Engineering</strong>　Harness 管"一个 Agent 运行的环境边界"，Workflow 管"多个 Agent 运行的顺序和依赖"——两者是垂直分层</li>
+                <li><strong>× Loop Engineering</strong>　Loop 触发 Workflow 实例，Workflow 跑完后把结果交给 Loop 验证和决策——Workflow 是 Loop 的执行单元</li>
+            </ul>
+
+            <!-- ========== 五、设计模式 ========== -->
+            <h2 id="moshi">五、设计模式：不只是"步骤 A → 步骤 B"</h2>
+            <p>Workflow 的设计模式决定了步骤之间的协作方式。选错模式，轻则性能浪费，重则逻辑混乱。</p>
+
+            <h3>5.1 线性链（Linear Chain）</h3>
+            <p>最简单的模式：步骤 1 → 步骤 2 → 步骤 3，串行执行。</p>
+            <p><strong>适用场景</strong>：步骤之间有强依赖，后一步必须等前一步完成。比如"查数据 → 分析 → 生成报告"。</p>
+            <p><strong>缺点</strong>：无法并行，总耗时 = 各步骤耗时之和。</p>
+
+            <h3>5.2 DAG（有向无环图）</h3>
+            <p>步骤之间有部分并行、部分串行。比如"获取 diff"后，"静态分析"和"安全扫描"可以并行，然后"汇总"等两者都完成。</p>
+            <p><strong>适用场景</strong>：中等复杂度（5-20 步），有部分分支可并行。</p>
+            <p><strong>关键</strong>：必须保证无环，否则会出现循环依赖，Workflow 永远跑不完。</p>
+
+            <h3>5.3 状态机（State Machine）</h3>
+            <p>步骤之间的流转由<strong>状态</strong>和<strong>事件</strong>驱动，而不是固定的顺序。比如"审查"步骤完成后，根据结果决定是"通过"、"需修改"还是"人工复核"。</p>
+            <p><strong>适用场景</strong>：需要在运行时根据结果动态改变路径，有明确的状态和转移条件。</p>
+
+            <h3>5.4 事件驱动（Event-Driven）</h3>
+            <p>步骤之间完全解耦，通过消息队列通信。一个步骤完成后发一个事件，感兴趣的步骤自己订阅。</p>
+            <p><strong>适用场景</strong>：大规模、高度并发、步骤之间需要完全独立。比如微服务架构下的 Workflow。</p>
+            <p><strong>缺点</strong>：调试困难，因为步骤之间的调用关系不是显式的，而是隐式通过事件关联。</p>
+
+            <h3>5.5 设计模式的选择框架</h3>
+            <p><strong>不同场景应该选什么模式？用这个决策树</strong>：</p>
+            <pre><code>Workflow 需要在运行时根据结果动态改变路径？
+├─ 是 → 状态机（允许分支、条件跳转）
+└─ 否 ↓
+
+步骤之间有依赖？能否并行执行？
+├─ 完全线性、无法并行 → 线性链
+├─ 有部分分支可并行 → DAG
+└─ 完全独立、解耦为上 → 事件驱动
+
+步骤数量和系统复杂度？
+├─ < 5 步、相对简单 → 线性链
+├─ 5-20 步、有分支 → DAG
+├─ > 20 步、高度并发 → 事件驱动
+└─ 需要状态机复杂度 → 状态机</code></pre>
+
+            <!-- ========== 六、状态管理 ========== -->
+            <h2 id="zhuangtai">六、状态管理：Workflow 的"记忆"</h2>
+            <p>Workflow 需要记忆什么？每一步的输入、输出、中间结果、当前进度。状态管理选错了，Workflow 要么跑不动，要么跑完结果对不上。</p>
+
+            <h3>6.1 状态管理的选择框架</h3>
+            <pre><code>共享状态 → 小规模 Workflow（< 10 步），步骤间耦合可接受
+消息传递 → 中等规模（10-50 步），强解耦需求
+持久化状态 → 长流程（> 50 步）、需要中断恢复、关键业务流程
+
+同时考虑：
+- 步骤数量：越多越需要持久化
+- 中断恢复需求：是否需要从中间恢复（有→持久化，无→共享状态）
+- 调试难度：共享状态最易调试，持久化最难</code></pre>
+
+            <h3>6.2 共享状态（Shared State）</h3>
+            <p>所有步骤读写同一个状态对象。简单直接，但耦合度高。</p>
+            <pre><code>state = {
+    "commit_sha": "abc123",
+    "diff": "...",
+    "analysis_report": None,  # 步骤 2 填充
+    "security_report": None,  # 步骤 3 填充
+    "final_report": None      # 步骤 4 填充
+}
+
+# 步骤 2
+def static_analysis(state):
+    state["analysis_report"] = analyze(state["diff"])
+    return state</code></pre>
+            <p><strong>风险</strong>：一个步骤改了状态，另一个步骤读了以为是对的，其实前面的步骤失败了没回滚。需要配合事务机制。</p>
+
+            <h3>6.3 消息传递（Message Passing）</h3>
+            <p>步骤之间通过显式的消息传递数据，不共享可变状态。每个步骤的输入是消息，输出也是消息。</p>
+            <pre><code># 步骤 2 输出
+msg = {
+    "type": "analysis_complete",
+    "payload": {"issues": [...]},
+    "correlation_id": "workflow_123"
+}
+
+# 步骤 4 订阅 "analysis_complete" 和 "security_complete" 两个消息
+# 收到两者后才执行</code></pre>
+            <p><strong>优势</strong>：解耦、可追踪、适合分布式。但调试时需要追踪消息流。</p>
+
+            <h3>6.4 持久化状态与 Checkpoint 机制</h3>
+            <p>生产环境的硬需求：<strong>Workflow 可能中途中断，必须能从断点恢复。</strong></p>
+            <p><strong>Checkpoint 机制</strong>：在每个关键步骤完成后，保存当前状态。</p>
+            <pre><code>def run_workflow_with_checkpoint(workflow_id):
+    last_checkpoint = load_checkpoint(workflow_id)
+    
+    if last_checkpoint:
+        start_step = last_checkpoint['completed_step'] + 1
+        state = last_checkpoint['state']
+    else:
+        start_step = 0
+        state = {}
+    
+    for step_idx in range(start_step, len(steps)):
+        state = execute_step(steps[step_idx], state)
+        save_checkpoint(workflow_id, step_idx, state)
+        # Checkpoint 里记什么：当前步骤序号、所有步骤的输出、时间戳
+        # 保存到哪：Redis 或数据库，用 Workflow ID 作 key</code></pre>
+            <p><strong>恢复策略</strong>：中断后重启时，检查最新 checkpoint，从 checkpoint 之后的步骤开始，前面已完成的步骤的输出不重新计算。</p>
+
+            <!-- ========== 七、错误处理 ========== -->
+            <h2 id="cuowu">七、错误处理：Workflow 的"安全气囊"</h2>
+            <p>Workflow 的错误处理不是"try-catch 包一下"，而是分层的、有策略的恢复机制。</p>
+
+            <h3>7.1 失败模式的三层分类</h3>
+            <p><strong>[步骤级失败]</strong> 这一步出错了</p>
+            <pre><code>├─ 瞬时失败（transient）：API 超时、网络抖动
+│  处理：指数退避重试（第 1 次立刻，2 秒后再来，4 秒后再来...）
+│  配置：max_retries = 3, backoff_factor = 2
+│
+├─ 逻辑失败（logical）：模型输出格式错、不符合 schema
+│  处理：
+│    1) 重新生成（概率 30%）
+│    2) 换模型（概率 20%）
+│    3) 人工介入（概率 50%）
+│  配置：fallback_chain = [regenerate, change_model, manual]
+│
+└─ 不可恢复失败（terminal）：权限不足、资源不存在
+   处理：直接终止 Workflow，报告错误</code></pre>
+
+            <p><strong>[依赖失败]</strong> 当前步骤依赖的上游步骤失败了</p>
+            <ul>
+                <li>关键依赖失败 → 终止整个 Workflow</li>
+                <li>可选依赖失败 → 标记"该数据未获取"，继续执行</li>
+                <li>部分依赖失败 → 运行"降级分支"</li>
+            </ul>
+
+            <p><strong>[Workflow 级失败]</strong> 整个 Workflow 出问题了</p>
+            <ul>
+                <li>状态损坏 → 从上一个 checkpoint 恢复</li>
+                <li>超时 → 尝试 cleanup，记录失败原因</li>
+                <li>资源耗尽 → 触发 alert，交人工处理</li>
+            </ul>
+
+            <h3>7.2 补偿事务（Compensation）</h3>
+            <p>当 Workflow 已经执行了几步后失败，已经完成的步骤可能需要"回滚"。比如"创建资源 → 配置资源 → 通知用户"，如果第三步失败，前两步创建的资源需要清理。</p>
+            <pre><code>步骤定义 = {
+    "execute": create_resource,
+    "compensate": delete_resource  # 失败时调用
+}
+
+# Workflow 引擎在失败时自动调用 compensate 函数
+# 补偿顺序与执行顺序相反：最后执行的步骤最先补偿</code></pre>
+            <p><strong>关键</strong>：补偿不是"撤销"，而是"清理"。补偿本身也可能失败，需要设计补偿的补偿（但通常不建议无限递归，设定最大补偿次数）。</p>
+
+            <h3>7.3 失败处理策略矩阵</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>失败类型</th>
+                        <th>表现</th>
+                        <th>策略</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>瞬时失败</td>
+                        <td>API 超时、网络抖动</td>
+                        <td>指数退避重试，最多 3 次</td>
+                    </tr>
+                    <tr>
+                        <td>逻辑失败</td>
+                        <td>输出格式错、不符合 schema</td>
+                        <td>fallback_chain：重试 → 换模型 → 人工</td>
+                    </tr>
+                    <tr>
+                        <td>不可恢复失败</td>
+                        <td>权限不足、资源不存在</td>
+                        <td>立即终止，报告错误</td>
+                    </tr>
+                    <tr>
+                        <td>依赖失败</td>
+                        <td>上游步骤失败</td>
+                        <td>关键依赖终止，可选依赖降级</td>
+                    </tr>
+                    <tr>
+                        <td>Workflow 级失败</td>
+                        <td>状态损坏、超时、资源耗尽</td>
+                        <td>Checkpoint 恢复 / Cleanup / 人工</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- ========== 八、框架对比 ========== -->
+            <h2 id="kuangjia">八、主流方案对比：该用框架还是自研？</h2>
+
+            <h3>8.1 框架对比表</h3>
+            <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>框架</th>
+                        <th>核心特点</th>
+                        <th>适用场景</th>
+                        <th>缺点</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>LangGraph</td>
+                        <td>与 LangChain 生态深度集成，图结构定义 Workflow</td>
+                        <td>快速迭代、LLM 密集型 Workflow</td>
+                        <td>适合快速迭代，不适合需要企业级可靠性的场景。如果你需要"99.9% uptime 的 SLA"，LangGraph 不够</td>
+                    </tr>
+                    <tr>
+                        <td>Temporal</td>
+                        <td>企业级持久化、分布式执行、自动重试和补偿</td>
+                        <td>长流程、关键业务、需要中断恢复</td>
+                        <td>学习曲线陡、基础设施重。如果 Workflow 很短（&lt; 1 分钟），Temporal 的复杂度不值得</td>
+                    </tr>
+                    <tr>
+                        <td>LlamaIndex Workflows</td>
+                        <td>面向 RAG 场景，与 LlamaIndex 生态集成</td>
+                        <td>RAG 密集型、数据流复杂的 Workflow</td>
+                        <td>当前还是新生态，社区沉淀少，坑可能多。适合"赌一个新生态会火"的团队</td>
+                    </tr>
+                    <tr>
+                        <td>自研</td>
+                        <td>完全可控，可定制审计日志、特殊权限管理</td>
+                        <td>有强定制需求、已有成熟基础设施</td>
+                        <td>如果"特定需求"能清楚描述（如审计日志、特殊权限管理），值得。否则八成是"打错主意"</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+
+            <h3>8.2 选择框架 vs 自研的决策树</h3>
+            <pre><code>问题 1：你的 Workflow 需要在多个机器上分布式跑吗？
+  ├─ 是 → Temporal（否则自研成本爆炸）
+  └─ 否 ↓
+
+问题 2：Workflow 可能在运行中中断并从中间恢复吗？
+  ├─ 是且很关键 → Temporal
+  ├─ 是但可接受一些数据丢失 → LangGraph + 自己实现简单 checkpoint
+  └─ 否 ↓
+
+问题 3：你有强定制需求（特殊权限、审计日志）吗？
+  ├─ 是 → 自研（或 Temporal 的自定义 Activity）
+  └─ 否 → LangGraph（快，好用，社区支持好）</code></pre>
+
+            <!-- ========== 九、实战案例 ========== -->
+            <h2 id="shizhan">九、实战案例：从 Plan 到 Spec 到实现</h2>
+            <p>下面展示一个完整的"代码审查自动化"Workflow，从 Plan 到 Spec 到实现的完整流程。</p>
+
+            <h3>Step 0：整体 Spec</h3>
+            <pre><code>【Workflow 整体 Spec】
+输入: GitHub 提交事件（commit SHA）
+输出: 审查报告（markdown）+ 是否允许合并（boolean）
+
+【整体验收标准】
+- 所有 3 个检查维度都必须完成
+- 报告必须在 10 分钟内生成
+- 如果有阻塞性问题，必须有"后续步骤"的建议
+
+【整体失败处理】
+- 某个检查超时 → 标记为"检查未完成"，不阻塞其他检查
+- 汇总阶段失败 → 回退到前一个 checkpoint，重新汇总
+- 整体超时 → 生成部分报告，标记为"超时中止"</code></pre>
+
+            <h3>Step 1：Plan（步骤拓扑图）</h3>
+            <pre><code>[获取 diff] ──→ [静态分析] ──┐
+                              ├──→ [汇总结果] ──→ [提交评论]
+[获取 diff] ──→ [安全扫描] ──┘</code></pre>
+            <p>静态分析和安全扫描并行，都依赖"获取 diff"，汇总依赖两者。</p>
+
+            <h3>Step 2：各步骤的 Spec</h3>
+            <pre><code>步骤 1: 获取 diff
+  输入: commit SHA
+  输出: diff（字符串）
+  验收: diff 不为空，包含变更文件列表
+  失败: 获取失败 → 重试 2 次，仍失败终止 Workflow
+
+步骤 2: 静态分析
+  输入: diff
+  输出: 分析报告（JSON：{issues: [{severity, line, message}]}
+  验收: 输出符合 schema，severity 只能是 info/warning/critical
+  失败: 格式不对 → 重新生成 1 次，仍失败标记为"分析未完成"
+
+步骤 3: 安全扫描
+  输入: diff
+  输出: 安全报告（JSON：{vulnerabilities: [{risk, type, line}]}
+  验收: 输出符合 schema，risk 只能是 low/medium/high
+  失败: 同步骤 2
+
+步骤 4: 汇总结果
+  输入: 分析报告 + 安全报告
+  输出: 审查报告（Markdown）+ 是否阻塞（boolean）
+  验收: 报告包含"摘要"、"详细问题"、"修复建议"三部分
+  失败: 汇总失败 → 从 checkpoint 恢复，重新汇总
+
+步骤 5: 提交评论
+  输入: 审查报告
+  输出: PR 评论 URL
+  验收: 评论成功提交，URL 可访问
+  失败: 提交失败 → 保存报告到本地，标记"需人工提交"</code></pre>
+
+            <h3>Step 3：Workflow 实现（伪代码）</h3>
+            <pre><code>class CodeReviewWorkflow:
+    def __init__(self, commit_sha):
+        self.state = {"commit_sha": commit_sha}
+        self.checkpoint = CheckpointStore()
+    
+    def run(self):
+        # 步骤 1: 获取 diff
+        self.state["diff"] = self.get_diff(self.state["commit_sha"])
+        self.checkpoint.save(1, self.state)
+        
+        # 步骤 2 & 3: 并行执行
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_analysis = executor.submit(self.static_analysis, self.state["diff"])
+            future_security = executor.submit(self.security_scan, self.state["diff"])
+            
+            self.state["analysis_report"] = future_analysis.result()
+            self.state["security_report"] = future_security.result()
+        
+        self.checkpoint.save(3, self.state)
+        
+        # 步骤 4: 汇总
+        self.state["final_report"], self.state["block"] = self.summarize(
+            self.state["analysis_report"],
+            self.state["security_report"]
+        )
+        self.checkpoint.save(4, self.state)
+        
+        # 步骤 5: 提交评论
+        self.state["comment_url"] = self.submit_comment(self.state["final_report"])
+        
+        return self.state["final_report"], self.state["block"]</code></pre>
+
+            <!-- ========== 十、与 Loop 的衔接 ========== -->
+            <h2 id="xunhuan">十、进阶：Workflow / Harness / Loop 的层级关系</h2>
+            <p>这三个概念经常被搞混，因为它们确实有重叠。但用一张表来看，各自职责很清楚：</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Harness Engineering</th>
+                        <th>Workflow</th>
+                        <th>Loop Engineering</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>时间维度</td>
+                        <td>单次 Agent 运行内</td>
+                        <td>单次运行的多步骤编排</td>
+                        <td>跨多次运行的调度和决策</td>
+                    </tr>
+                    <tr>
+                        <td>核心问题</td>
+                        <td>Agent 怎么安全地自主行动？</td>
+                        <td>多个步骤怎么连成一条链？</td>
+                        <td>多次运行怎么协调、什么时候停？</td>
+                    </tr>
+                    <tr>
+                        <td>关键组件</td>
+                        <td>权限边界、验证回路、重试机制</td>
+                        <td>任务定义、步骤顺序、数据流</td>
+                        <td>触发器、验证器、决策器、状态管理</td>
+                    </tr>
+                    <tr>
+                        <td>失败处理</td>
+                        <td>单步骤出错怎么办</td>
+                        <td>某个 Workflow 实例失败怎么办</td>
+                        <td>多次都失败了怎么办、什么时候认输</td>
+                    </tr>
+                    <tr>
+                        <td>例子</td>
+                        <td>给 Agent 加计数器防死循环</td>
+                        <td>设计"查数据 → 处理 → 生成报告"的三步链</td>
+                        <td>每天自动跑这个 Workflow，失败自动重试，5 天还失败就告诉人</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p><strong>环境隔离与资源管理</strong>（Workflow 和 Harness 的交界处）：</p>
+            <ul>
+                <li>Workflow 启动每一个步骤时，都需要给它分配一个独立的 Harness 环境吗？
+                  <ul>
+                    <li><strong>不一定</strong>——如果步骤之间完全无状态共享，可以复用同一个 Harness</li>
+                    <li><strong>但通常要隔离</strong>——防止一个步骤的异常行为污染另一个</li>
+                  </ul>
+                </li>
+                <li>Workflow 终止后，分配给它的 Harness 环境怎么清理？
+                  <ul>
+                    <li><strong>必须显式回收</strong>——否则资源泄漏，时间长了系统会窒息</li>
+                  </ul>
+                </li>
+            </ul>
+
+            <!-- ========== 十一、实战避坑 ========== -->
+            <h2 id="shizhan">十一、实战避坑：真实项目中最常见的坑</h2>
+
+            <h3>坑一：Plan 没画依赖图，步骤之间隐性耦合</h3>
+            <p><strong>翻车现场</strong>：一个 Workflow 有 5 个步骤，开发者按时间顺序写的代码。步骤 3 偷偷读了步骤 1 写在全局变量里的数据，步骤 5 又读了步骤 3 的副作用。后来步骤 2 加了缓存逻辑，步骤 1 的执行时机变了，步骤 3 读到的数据就不对了。</p>
+            <p><strong>根因</strong>：没有显式的依赖图，步骤之间的数据流是隐性的。</p>
+            <p><strong>解决方案</strong>：强制要求每个步骤的输入必须显式声明，不允许"偷偷读全局状态"。Workflow 引擎在调度时根据依赖图决定执行顺序，而不是代码里的调用顺序。</p>
+
+            <h3>坑二：Spec 写了但不可验证，变成"摆设"</h3>
+            <p><strong>翻车现场</strong>：Spec 里写"输出一份高质量的报告"，但"高质量"没有量化标准。不同开发者对"高质量"的理解不同，导致步骤的输出时好时坏，下游步骤接不住。</p>
+            <p><strong>根因</strong>：Spec 用了模糊词汇，没有可执行的验收标准。</p>
+            <p><strong>解决方案</strong>：Spec 必须用可验证的语言。不说"高质量"，说"报告必须包含摘要、详细问题、修复建议三部分，每部分不少于 100 字"。不说"格式正确"，说"输出必须是合法 JSON，schema 如下"。</p>
+
+            <h3>坑三：没有 Checkpoint，Workflow 一中断就从头来</h3>
+            <p><strong>翻车现场</strong>：一个长 Workflow 跑了 8 个步骤，第 8 步失败了。因为没有 Checkpoint，必须从头重新跑，前面 7 步的 API 调用和模型推理全部重来，既烧钱又慢。</p>
+            <p><strong>根因</strong>：没有持久化中间状态。</p>
+            <p><strong>解决方案</strong>：在每个关键步骤完成后保存 Checkpoint。恢复时从最新 Checkpoint 继续，不重新计算已完成的步骤。Checkpoint 里存：当前步骤序号、所有步骤的输出、时间戳。</p>
+
+            <!-- ========== 十二、结语 ========== -->
+            <h2 id="jieyu">十二、结语：Workflow 是"协作"的基础</h2>
+            <p><strong>给小白的话</strong>：Workflow 就是"让多个步骤协作完成一件事"。但不是简单地把步骤串起来，而是要想清楚：这件事分几步、每步做什么、做到什么程度算对、错了怎么办。好的 Workflow 像一支配合默契的球队——每个人知道自己该干什么、什么时候传球、失误了怎么补位。</p>
+            <p><strong>给开发者的话</strong>：Workflow 系统的性能瓶颈很少在"步骤执行有多快"，而在"步骤之间的数据流是否清晰、Spec 是否可验证、错了是否能恢复"。优化 Workflow 要从设计阶段开始——Plan 画清楚依赖图、Spec 写明白验收标准、状态管理选好持久化策略、错误处理分好层。光调步骤内部的 Prompt 是没用的。</p>
+            <p><strong>系列衔接</strong>：Workflow 把多个 Agent 调用编排成一条链，Harness 保证每个 Agent 安全运行，Loop 在背后调度 Workflow 的持续执行。Prompt 告诉每个步骤"干什么"，Context 控制"喂什么"，RAG 补充"外部知识"，Skill 把常用能力打包复用。七层协作，才能让 AI 系统从"单次对话"进化到"持续自主运行"。</p>
+            <blockquote>💡 <strong>Workflow 不是万能药，但它是现代 AI 应用从"玩具"变成"工具"的关键。一旦系统涉及多个步骤的协作，Workflow 层的设计质量往往决定了整体系统的可靠性。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Temporal 官方文档、LangGraph 官方文档、AWS Step Functions 最佳实践</p>
+
+            <nav class="article-nav">
+                <a href="harness-engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🔧 Harness Engineering</span>
+                    </span>
+                </a>
+                <a href="loop-engineering.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🔁 Loop Engineering</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>

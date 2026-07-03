@@ -23,7 +23,7 @@
 
     <section class="hero-compact">
         <h1>Application & Orchestration</h1>
-        <p>LLM 应用的工程化体系 · 6 篇实战笔记</p>
+        <p>LLM 应用的工程化体系 · 8 篇实战笔记</p>
     </section>
 
     <div class="site-layout">
@@ -36,62 +36,76 @@
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">📚 本专题文章</h3>
-                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🧠</span><span class="text">Agent</span></a>
-                <a href="skill.html" class="sidebar-item" title="Skill"><span class="icon">🛠️</span><span class="text">Skill</span></a>
-                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">🔧</span><span class="text">Harness Engineering</span></a>
-                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">📚</span><span class="text">Context Engineering</span></a>
                 <a href="prompt-engineering.html" class="sidebar-item" title="Prompt Engineering"><span class="icon">✍️</span><span class="text">Prompt Engineering</span></a>
-                <a href="loop-engineering.html" class="sidebar-item" title="Loop Engineering"><span class="icon">🔄</span><span class="text">Loop Engineering</span></a>
+                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">🧭</span><span class="text">Context Engineering</span></a>
+                <a href="rag-engineering.html" class="sidebar-item" title="RAG Engineering"><span class="icon">�</span><span class="text">RAG Engineering</span></a>
+                <a href="skill.html" class="sidebar-item" title="Skill"><span class="icon">🛠️</span><span class="text">Skill</span></a>
+                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🧠</span><span class="text">Agent</span></a>
+                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">�</span><span class="text">Harness Engineering</span></a>
+                <a href="workflow-engineering.html" class="sidebar-item" title="Workflow Engineering"><span class="icon">⚙️</span><span class="text">Workflow Engineering</span></a>
+                <a href="loop-engineering.html" class="sidebar-item" title="Loop Engineering"><span class="icon">�</span><span class="text">Loop Engineering</span></a>
             </div>
         </aside>
 
         <main>
             <section class="section">
                 <h2>📦 专题说明</h2>
-                <p>这一专题聚焦"怎么把 LLM 用起来"——围绕 Agent 这个执行载体，依次讲清楚它的六块拼图：</p>
+                <p>这一专题聚焦"怎么把 LLM 用起来"——从"写一句 Prompt"到"持续自主运行的调度系统"，按"从内到外、从单次到持续"的顺序讲清八块拼图：</p>
                 <ul>
-                    <li><strong>Agent</strong>　是执行的躯壳，决定"谁来做"</li>
-                    <li><strong>Skill</strong>　是装进躯壳的专业知识，决定"做得多专业"</li>
-                    <li><strong>Harness Engineering</strong>　是给它画的红线，决定"在多大范围内自主"</li>
-                    <li><strong>Context Engineering</strong>　是它的工作台，决定"一次能拿多少信息"</li>
-                    <li><strong>Prompt Engineering</strong>　是它的指令，决定"怎么理解任务"</li>
-                    <li><strong>Loop Engineering</strong>　是它的迭代闭环，决定"怎么越做越好"</li>
+                    <li><strong>Prompt Engineering</strong>　是单轮输入的指令写法，决定"怎么说清楚任务"</li>
+                    <li><strong>Context Engineering</strong>　是单次会话的信息组织，决定"喂什么、不喂什么"</li>
+                    <li><strong>RAG Engineering</strong>　是外部知识的供应链，决定"实时信息从哪来"</li>
+                    <li><strong>Skill</strong>　是常用能力的封装，决定"哪些动作可以一键调用"</li>
+                    <li><strong>Agent</strong>　是执行载体，决定"谁来做、做到什么程度"</li>
+                    <li><strong>Harness Engineering</strong>　是给 Agent 画的红线，决定"在多大范围内自主"</li>
+                    <li><strong>Workflow Engineering</strong>　是多步协作的编排，决定"多步怎么串成一条链"</li>
+                    <li><strong>Loop Engineering</strong>　是持续运行的调度系统，决定"什么时候该停、什么时候该交人"</li>
                 </ul>
-                <p>六篇互相咬合，建议按顺序读——前一篇文章里的概念，会在下一篇里被重新调用。</p>
+                <p>八篇互相咬合，建议按顺序读——前一篇文章里的概念，会在下一篇里被重新调用。</p>
             </section>
 
             <section class="section">
                 <h2>📚 本专题文章</h2>
                 <div class="articles-grid">
-                    <a href="agent.html" class="article-card">
-                        <div class="article-icon">🧠</div>
-                        <h3>Agent</h3>
-                        <p>智能体架构与自主决策</p>
+                    <a href="prompt-engineering.html" class="article-card">
+                        <div class="article-icon">✍️</div>
+                        <h3>Prompt Engineering</h3>
+                        <p>单轮指令的工程化写法</p>
+                    </a>
+                    <a href="context-engineering.html" class="article-card">
+                        <div class="article-icon">�</div>
+                        <h3>Context Engineering</h3>
+                        <p>单次会话的信息组织</p>
+                    </a>
+                    <a href="rag-engineering.html" class="article-card">
+                        <div class="article-icon">🔍</div>
+                        <h3>RAG Engineering</h3>
+                        <p>外部知识的检索与注入</p>
                     </a>
                     <a href="skill.html" class="article-card">
                         <div class="article-icon">🛠️</div>
                         <h3>Skill</h3>
                         <p>AI 工具能力的最小单元</p>
                     </a>
+                    <a href="agent.html" class="article-card">
+                        <div class="article-icon">🧠</div>
+                        <h3>Agent</h3>
+                        <p>智能体架构与自主决策</p>
+                    </a>
                     <a href="harness-engineering.html" class="article-card">
-                        <div class="article-icon">🔧</div>
+                        <div class="article-icon">�</div>
                         <h3>Harness Engineering</h3>
                         <p>LLM 应用的工程化框架</p>
                     </a>
-                    <a href="context-engineering.html" class="article-card">
-                        <div class="article-icon">📚</div>
-                        <h3>Context Engineering</h3>
-                        <p>上下文管理的设计原则</p>
-                    </a>
-                    <a href="prompt-engineering.html" class="article-card">
-                        <div class="article-icon">✍️</div>
-                        <h3>Prompt Engineering</h3>
-                        <p>提示词工程的系统方法</p>
+                    <a href="workflow-engineering.html" class="article-card">
+                        <div class="article-icon">⚙️</div>
+                        <h3>Workflow Engineering</h3>
+                        <p>多步协作的可验证编排</p>
                     </a>
                     <a href="loop-engineering.html" class="article-card">
-                        <div class="article-icon">🔄</div>
+                        <div class="article-icon">�</div>
                         <h3>Loop Engineering</h3>
-                        <p>循环工程的迭代方法论</p>
+                        <p>持续运行的调度系统</p>
                     </a>
                 </div>
             </section>

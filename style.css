@@ -100,7 +100,11 @@ a:hover { color: var(--primary-dark); }
 .table-scroll { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0; }
 .table-scroll > table { margin: 0; }
 [data-theme="dark"] { --primary: #818cf8; --primary-dark: #6366f1; --text: #e5e7eb; --text-light: #9ca3af; --bg: #111827; --card-bg: #1f2937; --border: #374151; --shadow: 0 10px 30px rgba(0, 0, 0, 0.3); --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.45); }
-body.reading-mode .sidebar, body.reading-mode .articles-grid { display: none; }
+/* 阅读模式：聚焦正文
+   - 仅隐藏侧边栏（导航/专题链接），让正文居中更宽
+   - 不隐藏 .articles-grid / .topics-grid：这些是页面核心内容卡片，
+     专题页（application.html）的文章列表必须在阅读模式下继续显示 */
+body.reading-mode .sidebar { display: none; }
 body.reading-mode .site-layout { grid-template-columns: 1fr; max-width: 760px; }
 body.reading-mode .container { max-width: 760px; margin: 40px auto; }
 body.reading-mode main { font-size: 1.1rem; line-height: 1.9; }
