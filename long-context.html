@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!-- 文章页：Long Context — Foundation & Core Algorithms 专题第八篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Long Context · kipozannaki</title>
+    <meta name="description" content="为什么模型号称支持 128K 上下文，用到后段效果却明显打折？一篇讲清 RoPE 外推、位置插值、稀疏注意力这些让上下文变长的具体技术。">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) {}
+    })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>📏 Long Context：上下文窗口的数字，是怎么被「撑大」的？</h1>
+            <p class="meta">为什么号称支持 128K，用到接近上限时效果就开始打折？一篇讲清 RoPE 外推和稀疏注意力 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能直接从头拉长训练</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <h2>先说清楚：这篇和 Context Engineering 不是一回事</h2>
+            <p>开篇先把边界划清楚，免得读混了——<strong>本篇讲的是「模型技术上能不能处理更长的输入」，这是一个底层能力问题</strong>；应用专题里的 Context Engineering 讲的是<strong>「开发者该往这个窗口里塞什么、怎么组织」，这是一个应用层问题</strong>。一个模型就算技术上支持 128K 上下文，应用层依然需要精心设计塞进去的内容——两者不能互相替代，本篇也不会重复 Context Engineering 已经讲过的内容。</p>
+
+            <h2 id="intro">零、引言：窗口数字越标越大，靠不靠谱是另一回事</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么一个模型号称支持 128K 甚至 1M 上下文，官方文档却经常悄悄提示「超长文本下效果会有所下降」？</li>
+                <li>为什么把训练时的上下文长度直接拉长十倍重新训练，成本不是涨十倍，而是爆炸性增长？</li>
+                <li>「位置编码外推」和「位置插值」到底是什么意思，为什么要专门处理这件事？</li>
+                <li>稀疏注意力号称能大幅提速，为什么有些任务用了之后反而变差了？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>Long Context</strong> 这套专门用来「撑大」上下文窗口的技术组合里。Attention 那篇讲过，标准 Attention 的计算量随序列长度呈平方级增长，位置编码超出训练范围会出现外推失败——本篇要讲的，正是业内怎么想办法绕开或缓解这两个硬约束，把上下文窗口一步步撑到今天动辄十万、百万级别的。</p>
+            <blockquote>💡 <strong>上下文窗口的数字是招牌上写的承诺，不是效果的保证书——招牌能挂多大，跟里面撑不撑得住，是两件需要分开验证的事。</strong></blockquote>
+
+            <h2 id="zuobiao">一、Long Context 在 AI 世界里的坐标</h2>
+            <p>这一部分技术直接建立在前面两篇的基础上：</p>
+            <pre><code>Attention / Transformer（O(n²) 计算复杂度 ＋ 位置编码超范围会外推失败）
+    ↓
+Long Context：位置编码扩展技术 ＋ 稀疏注意力 ＋ 渐进式长度训练  ← 本篇
+    ↓
+更长的、可用的上下文窗口</code></pre>
+            <p>这一层技术的影响会渗透到工程体系里：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 Long Context 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Attention / Transformer</td><td>本篇建立在那篇讲过的 O(n²) 复杂度和位置编码机制之上，讲的是业内怎么绕开或缓解这两个限制</td></tr>
+                    <tr><td>Context Engineering</td><td>本篇讲模型底层「能不能处理更长输入」，Context Engineering 讲应用层「该往里面塞什么」——上面已经划清界限，这里不重复</td></tr>
+                    <tr><td>Topic③ 推理优化</td><td>上下文长度直接影响 KV Cache 占用和推理成本，本篇的技术进步会直接反映在推理开销上</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>窗口数字是能力的上限承诺，不是能力的稳定保证——这是本篇从头到尾都要提醒你的一句话。</strong></blockquote>
+
+            <h2 id="why">二、为什么不能直接把训练时的上下文长度设得很大？</h2>
+            <p>一个直觉的问题：既然想要长上下文，为什么不干脆从预训练第一天开始就用超长序列训练？</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>从头就用超长上下文预训练</td>
+                        <td>直接用比如百万级长度的序列贯穿整个预训练过程</td>
+                        <td>Attention 的计算量随序列长度呈平方级增长，训练成本会随之爆炸式上升，在现实算力预算下几乎不可行</td>
+                    </tr>
+                    <tr>
+                        <td>找足够多天然超长的连贯文本</td>
+                        <td>全部用真实存在的超长文档做训练语料</td>
+                        <td>真正连贯、高质量的超长文本在互联网语料里占比并不高，很难凑够训练所需的数据量</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>实际做法通常是<strong>分阶段走</strong>：先用较短的上下文（比如 4K 或 8K）完成大部分预训练，再通过一个专门的「长文本扩展」阶段，配合特定技术把窗口逐步撑开——这就引出了下一节要讲的具体技术。</p>
+            <blockquote>💡 <strong>不是一开始就练百米冲刺，是先把基本功打扎实，再专门加练一段「怎么跑更远」。</strong></blockquote>
+
+            <h2 id="how">三、Long Context 到底是怎么工作的？</h2>
+            <p>主要有两条技术路线，经常搭配使用：</p>
+            <p><strong>位置编码扩展</strong>：目前主流模型常用的位置编码方案是 <strong>RoPE（Rotary Position Embedding，旋转位置编码）</strong>，它用旋转变换的方式给每个位置分配一个角度。模型训练时只见过某个范围内的角度值，如果直接把序列长度拉长到训练时从未见过的范围，相当于让模型处理一批「从没见过的旋转角度」，效果会打折扣——这正是前几篇提到的「位置编码外推失败」的具体机制。常见的应对方法是<strong>位置插值（Position Interpolation）</strong>：不是直接外推到没见过的范围，而是把更长的位置编号「压缩缩放」进模型已经见过的角度范围内，相当于把新的长序列「内插」进已知坐标系，而不是外推到未知区域——这样只需要相对较小的微调成本，就能让模型适应更长的输入。此外也有一些方法通过调整 RoPE 的基频参数，让位置编码在更大范围内依然保持合理的区分度。</p>
+            <p><strong>稀疏注意力（Sparse Attention）</strong>：标准 Attention 要求每个 Token 和所有其他 Token 两两计算关联度。稀疏注意力的思路是——不是所有 Token 对之间的关联都同等重要，可以只让每个 Token 关注一部分「最相关」的其他 Token（比如固定窗口内的邻近 Token，加上少数几个全局关键 Token），而不是全部计算一遍。这样能把 O(n²) 的计算量降到接近线性，代价是可能损失一部分原本能捕捉到的远距离细粒度关联。</p>
+            <p>两条路线通常配合「渐进式长度训练」策略一起用——先短后长，逐步引入更长的训练样本，用相对可控的额外成本把窗口撑开，而不是从零开始就用超长序列硬训。</p>
+            <blockquote>💡 <strong>位置插值是把新地图「缩放」进模型认识的旧坐标系里；稀疏注意力是让模型学会「选择性地看」，不再要求它把每个角落都看一遍——两条路线都是在用一部分精度，换取可行性。</strong></blockquote>
+
+            <h2 id="impact">四、Long Context 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+
+            <h3>为什么号称支持 128K，用到接近上限时效果就开始打折？</h3>
+            <p><strong>翻车现场</strong>：一个模型标称「支持 128K 上下文」，实测发现输入长度接近上限时，回答质量和准确率有明显下滑，而不是稳定支撑到 128K 再突然失效。</p>
+            <p><strong>根因</strong>：窗口数字是技术上限，不是效果保证——用位置插值等技术扩展出来的长上下文能力，本质是一种「打了折扣的泛化」，越接近扩展验证时的边界，效果衰减往往越明显。这和 Attention 那篇提到的「外推失败」，是同一类现象在长上下文场景下的具体体现。</p>
+
+            <h3>为什么用了稀疏注意力的模型，在「精确定位细节」任务上表现变差？</h3>
+            <p><strong>翻车现场</strong>：某个长文本模型启用稀疏注意力处理超长输入，整体速度明显提升，但在「从一大段文本里精确找出某个具体细节」这类任务上，准确率比同等长度、用完整 Attention 的模型要差。</p>
+            <p><strong>根因</strong>：稀疏注意力本质是在用「损失部分远距离细粒度关联」换取计算效率。如果任务恰好依赖那些被稀疏化规则忽略掉的 Token 关联，效果就会打折扣——这是一个明确的效率与精度权衡，不是实现上的 bug。</p>
+
+            <h3>为什么强行给一个原生短上下文模型做位置插值扩展，效果不如原生长上下文模型？</h3>
+            <p><strong>翻车现场</strong>：拿一个原生只支持 4K 的模型，用位置插值技术强行扩展到 32K，技术上能跑起来，但在复杂的长距离推理任务上，表现明显不如原生就在 32K 甚至更长上下文环境里训练出来的模型。</p>
+            <p><strong>根因</strong>：位置插值本质是一种「事后补救」手段，能让模型不报错、能正常运行，但模型在原始训练阶段积累的语言能力，并不是专门针对超长距离关联优化过的，补救效果有天花板，跟从一开始就在长上下文环境里训练出来的能力，不是同一个量级。</p>
+            <blockquote>💡 <strong>长上下文能力分两种：一种是「从小就练出来的」，一种是「后来临时抱佛脚补的」——两种都能让参数标得很大，实际靠不靠谱，得拉出来实测才知道。</strong></blockquote>
+
+            <h2 id="engineering">五、为什么开发者一定要懂 Long Context？</h2>
+            <p><strong>模型选型与评测</strong>：看到「支持 XXX 上下文」的宣传参数，不能直接等同于「在 XXX 长度下效果依然可靠」——需要实际测试模型在接近上限长度时的表现，而不是只看这个技术参数下结论。</p>
+            <p><strong>呼应 Context Engineering</strong>：本篇讲清楚了长上下文存在「打折的泛化」这个技术局限，这也是为什么 Context Engineering 里「精简上下文、把关键信息放在开头结尾」这类应用层实践建议，不只是经验之谈，而是有底层技术必然性支撑的判断。</p>
+            <p><strong>推理优化 Topic③</strong>：稀疏注意力等技术除了影响效果，也直接关系到推理速度和成本，选型时这两头要一起权衡，不能只看速度不看精度损失。</p>
+            <p><strong>往下一篇的伏笔</strong>：目前为止讨论的都还是纯文字的世界——下一篇 Multimodal 要讲的，是图片、音频这些非文字信息，是怎么被塞进同一套 Attention 机制里一起处理的。</p>
+
+            <h2 id="wuqu">六、常见误区</h2>
+
+            <h3>误区一：上下文窗口标多大，就等于模型在那个长度下效果一样可靠</h3>
+            <p><strong>真相</strong>：窗口大小是技术上限，不是效果保证，越接近训练或扩展验证过的边界，效果衰减往往越明显，需要实际测试而不是只看参数下结论。</p>
+
+            <h3>误区二：稀疏注意力只是纯粹的效率优化，不影响模型效果</h3>
+            <p><strong>真相</strong>：稀疏注意力是效率和精度之间的权衡——省下计算量的代价，通常是损失了一部分被规则忽略掉的远距离细粒度关联，某些任务会因此表现变差。</p>
+
+            <h3>误区三：只要用位置插值这类技术，任何模型都能无痛扩展到任意长的上下文</h3>
+            <p><strong>真相</strong>：位置插值是一种事后补救手段，能让模型技术上跑起来，但效果天花板明显低于原生在长上下文环境里训练出来的模型，不是没有代价的免费扩容。</p>
+
+            <h3>误区四：长上下文技术解决的问题，跟 Context Engineering 是一回事</h3>
+            <p><strong>真相</strong>：长上下文技术解决的是「模型技术上能不能处理更长输入」这个底层能力问题，Context Engineering 解决的是「开发者该往这个窗口里塞什么、怎么组织」这个应用层问题——一个模型即使支持很长的上下文，应用层依然需要精心设计塞进去的内容。</p>
+            <blockquote>💡 <strong>判断一个模型的长上下文能力靠不靠谱，别只看它标了多大的窗口，去看它是怎么把窗口撑到这么大的——是从小练出来的，还是临时插值补出来的，效果天差地别。</strong></blockquote>
+
+            <h2 id="jieyu">七、总结：撑大窗口容易，撑得住效果难</h2>
+            <p><strong>给小白的话</strong>：下次看到某个模型「支持超长上下文」的宣传，可以多问一句——这个长度下的效果经过实测吗，还是只是技术上能跑起来而已。</p>
+            <p><strong>给开发者的话</strong>：Long Context 不是一个单一技术，而是位置编码扩展（RoPE 外推/插值）和稀疏注意力这类效率优化手段的组合拳，两条路线都是在用一部分精度换取可行性。理解这一点，选型时才能真正看懂「支持 XXX 上下文」这句话背后藏着什么样的权衡，而不是只看一个数字做决定。</p>
+            <blockquote>💡 <strong>上下文窗口从 4K 涨到百万级，靠的不是魔法，是一套接一套「用可控的代价换取可行性」的工程妥协——理解这些妥协，才能判断哪个模型的长上下文是真本事，哪个是营销话术。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Su et al., <em>RoFormer</em> 相关研究（RoPE 旋转位置编码）；Chen et al. 关于位置插值（Position Interpolation）的相关研究；Longformer、BigBird 等稀疏注意力相关研究</p>
+
+            <nav class="article-nav">
+                <a href="moe.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🧩 MoE</span>
+                    </span>
+                </a>
+                <!-- 专题暂到 8 篇，第八篇之后无下一篇文章，按钮回到专题页作为占位
+                     后续若新增 Multimodal 等文章，需同步改 href 和文案 -->
+                <a href="foundation.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">已读完 8 篇 · 返回专题</span>
+                        <span class="nav-title">🧬 Foundation 专题</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
