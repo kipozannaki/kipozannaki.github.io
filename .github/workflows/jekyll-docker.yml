@@ -6,15 +6,44 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# 核心安全红线：必须显式授权允许写入 Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 允许单路并发，防止前后两次部署打架
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
+
+    # 第一步：用你指定的 Docker 镜像把包含未来文章的整站编译到 _site 目录
     - name: Build the site in the jekyll/builder container
       run: |
         docker run \
         -v ${{ github.workspace }}:/srv/jekyll -v ${{ github.workspace }}/_site:/srv/jekyll/_site \
         jekyll/builder:latest /bin/bash -c "chmod -R 777 /srv/jekyll && jekyll build --future"
+
+    # 第二步：强行把刚刚编好的 _site 生产线产物打包（精准打包，绝不漏掉 html）
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v4
+      with:
+        path: './_site'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps: deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    # 第三步：给 Pages 服务临门一脚，强制发布
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v5
