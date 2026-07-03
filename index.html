@@ -85,7 +85,7 @@
                     <div class="topic-icon">🧬</div>
                     <div class="topic-info">
                         <h3>Foundation & Core Algorithms</h3>
-                        <p>AI 本身是怎么工作的：Tokenization / Embedding / Attention / Pretraining / Alignment / Inference / MoE / Long Context 八层全景。已上线 8 篇。</p>
+                        <p>AI 本身是怎么工作的：Tokenization / Embedding / Attention / Pretraining / Alignment / Inference / MoE / Long Context / Multimodal 九层全景。已上线 9 篇（2026-07-03 增 Multimodal）。</p>
                         <span class="topic-cta">进入专题 →</span>
                     </div>
                 </a>
@@ -150,6 +150,8 @@
         readBtn.addEventListener('click', function() {
             document.body.classList.toggle('reading-mode');
             const on = document.body.classList.contains('reading-mode');
+            // 用 toggle 同步按钮 active 状态：开启时加 active，关闭时移除
+            // 旧代码用 add 只加不移，导致关闭阅读模式后按钮仍高亮
             readBtn.classList.toggle('active');
             safeSet('reading', on ? '1' : '0');
         });
