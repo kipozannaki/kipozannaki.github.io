@@ -150,7 +150,9 @@
         readBtn.addEventListener('click', function() {
             document.body.classList.toggle('reading-mode');
             const on = document.body.classList.contains('reading-mode');
-            readBtn.classList.add('active');
+            // 用 toggle 同步按钮 active 状态：开启时加 active，关闭时移除
+            // 旧代码用 add 只加不移，导致关闭阅读模式后按钮仍高亮
+            readBtn.classList.toggle('active');
             safeSet('reading', on ? '1' : '0');
         });
         sideBtn.addEventListener('click', function() {
