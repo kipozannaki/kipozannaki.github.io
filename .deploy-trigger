@@ -1,3 +1,1 @@
-2026-07-03 03:24 UTC+8 - manual redeploy trigger via MCP
-
-Previous commit (4d76cbd) deploy step failed with 'try again later' on GitHub Pages. This empty trigger file forces actions to re-run. Code is unchanged.
+trigger
