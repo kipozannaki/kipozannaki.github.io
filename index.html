@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 首页：双专题入口 + 5 个 section + 暗色/阅读模式切换
+<!-- 首页：三专题入口 + 5 个 section + 暗色/阅读模式切换
      参考 https://bobcgn.github.io/quartz-myblogs/ 的极简索引风格 -->
 <html lang="zh-CN">
 <head>
@@ -15,6 +15,7 @@
         <nav class="site-nav">
             <a href="application.html">Application</a>
             <a href="foundation.html">Foundation</a>
+            <a href="frontier.html">Frontier</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -24,7 +25,7 @@
 
     <section class="hero-compact">
         <h1>AI 主题内容站</h1>
-        <p>LLM 应用工程 + AI 底层算法的实战笔记与沉淀</p>
+        <p>LLM 应用工程 + AI 底层算法 + 前沿研究的实战笔记与沉淀</p>
     </section>
 
     <div class="site-layout">
@@ -34,6 +35,7 @@
                 <h3 class="sidebar-title">📂 专题</h3>
                 <a href="application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
                 <a href="foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
+                <a href="frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">🔗 站内导航</h3>
@@ -48,10 +50,11 @@
         <main>
             <section id="about-site" class="section">
                 <h2>🏠 关于本站</h2>
-                <p>这是我的 AI 主题内容站，围绕两个方向写实战笔记：</p>
+                <p>这是我的 AI 主题内容站，围绕三个方向写实战笔记：</p>
                 <ul>
                     <li><strong>应用与编排</strong>——怎么把 LLM 用起来：Agent / Skill / Harness / Context / Prompt / Loop 六块拼图</li>
                     <li><strong>底层与算法</strong>——AI 本身是怎么工作的：Tokenization / Embedding 起步，逐步深入 Transformer 与训练范式</li>
+                    <li><strong>前沿研究</strong>——AI 现在最前沿在探索什么：推理范式、Test-Time Compute、协作协议</li>
                 </ul>
                 <p>每一篇都是"读 + 写 + 改"的实战笔记——不是把官方文档换个皮，是"我跑一遍踩了哪些坑、最后怎么收的口"。</p>
                 <p>目标读者：想用 LLM 做点真东西、不想被 PPT 词条忽悠的开发者；刚开始上路不知道怎么做的新手小白。</p>
@@ -86,6 +89,14 @@
                     <div class="topic-info">
                         <h3>Foundation & Core Algorithms</h3>
                         <p>AI 本身是怎么工作的：Tokenization / Embedding / Attention / Pretraining / Alignment / Inference / MoE / Long Context / Multimodal 九层全景。已上线 9 篇（2026-07-03 增 Multimodal）。</p>
+                        <span class="topic-cta">进入专题 →</span>
+                    </div>
+                </a>
+                <a href="frontier.html" class="topic-card">
+                    <div class="topic-icon">🔭</div>
+                    <div class="topic-info">
+                        <h3>Frontier & Emerging Research</h3>
+                        <p>AI 前沿研究：跟着论文走——推理范式、Test-Time Compute、Agent 记忆与协作协议。内容建设中。</p>
                         <span class="topic-cta">进入专题 →</span>
                     </div>
                 </a>
