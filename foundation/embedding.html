@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedding · kipozannaki</title>
+    <meta name="description" content="为什么换个 Embedding 模型 RAG 检索全崩、「国王-男人+女人≈女王」为什么复现不出来？一篇讲清向量空间的世界。">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+    <article class="article-page">
+        <header class="article-header">
+            <h1>📐 Embedding：为什么「国王－男人＋女人≈女王」是个陷阱？</h1>
+            <p class="meta">为什么换个模型 RAG 检索全崩？一篇讲清向量空间的世界 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能直接用 Token ID</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#shizhan">常见误区</a> · <a href="#jieyu">总结</a></p>
+            <h2 id="intro">零、引言：「Embedding 不就是把字变成数字吗？」</h2>
+            <p>先扔几个问题：为什么换了一个 Embedding 模型，RAG 检索直接全崩？为什么「国王－男人＋女人≈女王」复现不出来？为什么两句话余弦相似度是 0.82，到底算相似还是不相似？为什么中文语料训练出来的 Embedding 模型，搜英文文档直接搜不到？</p>
+            <p>答案：Token 只是给每个字一个编号，编号本身没有意义；<strong>Embedding 才是第一次让模型知道，「国王」和「女王」要比「国王」和「香蕉」离得更近</strong>。</p>
+            <blockquote>💡 <strong>Tokenization 决定文字怎么被切开。Embedding 决定切出来的每一块，在模型眼里「长在哪儿」。</strong></blockquote>
+            <h2 id="zuobiao">一、Embedding 在 AI 世界里的坐标</h2>
+            <pre><code>Human Language → Tokenizer → Token ID → Embedding（把编号映射成有几何关系的向量）← 本篇 → Transformer → Inference → LLM 输出</code></pre>
+            <p>Token ID 只是编号，17421 和 17422 之间没有任何数学意义上的接近。Embedding 要做的事，就是把这些孤立的编号，重新安放进一个几百到上万维的空间里，让<strong>意思相近的词，位置也相近</strong>。</p>
+            <table>
+                <thead><tr><th>工程概念</th><th>跟 Embedding 的关系</th></tr></thead>
+                <tbody>
+                    <tr><td>RAG Engineering</td><td>检索的本质就是比较 query 和 chunk 的向量距离</td></tr>
+                    <tr><td>Context Engineering</td><td>语义去重、相关性排序，打分依据都是 Embedding 相似度</td></tr>
+                    <tr><td>Prompt Engineering</td><td>Few-shot 示例的自动挑选，常靠 Embedding 相似度</td></tr>
+                    <tr><td>Agent</td><td>语义记忆靠 Embedding 支撑</td></tr>
+                    <tr><td>多模态</td><td>图片 Patch 最终也会变成向量</td></tr>
+                </tbody>
+            </table>
+            <h2 id="why">二、为什么不能直接拿 Token ID 当输入？</h2>
+            <table>
+                <thead><tr><th>方案</th><th>致命问题</th></tr></thead>
+                <tbody>
+                    <tr><td>直接用 Token ID 当数值</td><td>编号的大小顺序毫无意义</td></tr>
+                    <tr><td>One-hot 编码</td><td>词表十万个 Token，向量就要十万维；任意两个 Token 距离完全相等</td></tr>
+                    <tr><td>人工打标签</td><td>人力成本不可能覆盖全部语言现象</td></tr>
+                </tbody>
+            </table>
+            <p>最终收敛到的方案：<strong>用一段从数据里自动学出来的稠密向量，代替人工规则</strong>。</p>
+            <h2 id="how">三、Embedding 到底是怎么工作的？</h2>
+            <p>每个 Token 一开始被随机初始化成一个高维向量，然后在海量文本上反复调整——核心任务通常是「预测上下文」：如果两个词经常出现在相似的语境里，它们的向量就会被训练得越来越靠近。</p>
+            <p><strong>关键区分</strong>：Token Embedding（LLM 内部第一层）vs 文本/句子 Embedding 模型（做 RAG 的人实际调用的东西）——两者同名不同物。</p>
+            <h2 id="impact">四、Embedding 会如何影响模型能力？</h2>
+            <h3>为什么换个 Embedding 模型，RAG 检索直接全崩？</h3>
+            <p>不同 Embedding 模型的向量空间是互不兼容的坐标系——换模型之后必须对整个向量库做 reindex。</p>
+            <h3>为什么「国王－男人＋女人≈女王」复现不出来？</h3>
+            <p>这个例子最早来自训练方式相对简单、维度较低的早期词向量模型。现代 Embedding 模型维度更高、训练目标更复杂，类比关系依然存在，但不再具备精确性。</p>
+            <h3>为什么中文 Embedding 模型搜不到英文文档？</h3>
+            <p>不是所有 Embedding 模型都天然支持跨语言对齐。如果训练数据里没有显式对齐过中英文，模型学到的中文和英文可能活在向量空间里两个几乎不重叠的区域。</p>
+            <h2 id="engineering">五、为什么开发者一定要懂 Embedding？</h2>
+            <p>RAG 检索质量的天花板由 Embedding 模型的语义对齐能力决定——这是地基。选错模型，后面所有工程手艺都是在给一个漏水的桶打补丁。</p>
+            <h2 id="jieyu">七、总结：文字属于人类，向量属于模型</h2>
+            <p><strong>给小白的话</strong>：下次遇到「搜索结果文不对题」，别急着怪 AI 笨——很可能是负责「理解相似」的那一层，从一开始就没认对语言。</p>
+            <p><strong>给开发者的话</strong>：Embedding 不是接一个 API、拿到一串数字就完事的黑盒。它决定了 RAG 的检索质量上限，决定了语义记忆能不能「想起相关的事」。</p>
+            <blockquote>💡 <strong>Token 让文字有了编号。Embedding 让编号有了意义。</strong></blockquote>
+            <p class="refs"><strong>参考资料</strong>：分布式语义假设相关经典研究；word2vec 原始论文；Sentence-BERT 相关工作</p>
+            <nav class="article-nav">
+                <a href="tokenization.html" class="nav-card nav-prev"><span class="nav-arrow">←</span><span class="nav-content"><span class="nav-label">上一篇</span><span class="nav-title">🪙 Tokenization</span></span></a>
+                <a href="attention-transformer.html" class="nav-card nav-next"><span class="nav-content"><span class="nav-label">下一篇</span><span class="nav-title">🧠 Attention / Transformer</span></span><span class="nav-arrow">→</span></a>
+            </nav>
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+    <footer class="site-footer"><p>© 2026 · kipozannaki</p></footer>
+</body>
+</html>
