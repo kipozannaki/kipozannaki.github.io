@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Frontier & Emerging Research 专题页：0 篇，内容建设中 -->
+<!-- Frontier & Emerging Research 专题页：11 篇（2026-07-04 批量上线） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -24,7 +24,7 @@
 
     <section class="hero-compact">
         <h1>Frontier & Emerging Research</h1>
-        <p>AI 前沿研究：跟着论文走 · 0 篇笔记（内容建设中）</p>
+        <p>AI 前沿研究：跟着论文走 · 11 篇笔记（2026-07-04 批量上线）</p>
     </section>
 
     <div class="site-layout">
@@ -38,7 +38,17 @@
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">📚 本专题文章</h3>
-                <p class="sidebar-empty">暂无文章，敬请期待</p>
+                <a href="reasoning-model.html" class="sidebar-item" title="Reasoning Model"><span class="icon">🧠</span><span class="text">Reasoning Model</span></a>
+                <a href="test-time-compute.html" class="sidebar-item" title="Test-Time Compute"><span class="icon">⏱️</span><span class="text">Test-Time Compute</span></a>
+                <a href="inference-scaling.html" class="sidebar-item" title="Inference Scaling"><span class="icon">📈</span><span class="text">Inference Scaling</span></a>
+                <a href="mcts-tree-search.html" class="sidebar-item" title="MCTS / Tree Search"><span class="icon">🌳</span><span class="text">MCTS / Tree Search</span></a>
+                <a href="rlvr.html" class="sidebar-item" title="RLVR"><span class="icon">🎯</span><span class="text">RLVR</span></a>
+                <a href="world-model.html" class="sidebar-item" title="World Model"><span class="icon">🌍</span><span class="text">World Model</span></a>
+                <a href="agent-memory.html" class="sidebar-item" title="Agent Memory"><span class="icon">🧷</span><span class="text">Agent Memory</span></a>
+                <a href="multimodal-agent.html" class="sidebar-item" title="Multimodal Agent"><span class="icon">🖇️</span><span class="text">Multimodal Agent</span></a>
+                <a href="a2a.html" class="sidebar-item" title="A2A"><span class="icon">🤝</span><span class="text">A2A</span></a>
+                <a href="mcp-evolution.html" class="sidebar-item" title="MCP Evolution"><span class="icon">🔌</span><span class="text">MCP Evolution</span></a>
+                <a href="long-thinking.html" class="sidebar-item" title="Long Thinking"><span class="icon">💭</span><span class="text">Long Thinking</span></a>
             </div>
         </aside>
 
@@ -59,29 +69,62 @@
 
             <section class="section">
                 <h2>📚 本专题文章</h2>
-                <p>内容持续更新中，规划中的篇目（按写作顺序排列）：</p>
-                <div class="planned-articles">
-                    <span class="planned-item">Reasoning Model</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">Test-Time Compute</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">Inference Scaling</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">MCTS / Tree Search</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">RLVR</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">World Model</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">Agent Memory</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">Multimodal Agent</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">A2A</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">MCP Evolution</span>
-                    <span class="planned-arrow">→</span>
-                    <span class="planned-item">Long Thinking</span>
+                <div class="articles-grid">
+                    <a href="reasoning-model.html" class="article-card">
+                        <div class="article-icon">🧠</div>
+                        <h3>Reasoning Model</h3>
+                        <p>为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
+                    </a>
+                    <a href="test-time-compute.html" class="article-card">
+                        <div class="article-icon">⏱️</div>
+                        <h3>Test-Time Compute</h3>
+                        <p>为什么同一个模型多问几次投票选答案，正确率能明显提升？一篇讲清"花测试时算力"到底有哪些具体方法，以及为什么不是越多越好。</p>
+                    </a>
+                    <a href="inference-scaling.html" class="article-card">
+                        <div class="article-icon">📈</div>
+                        <h3>Inference Scaling</h3>
+                        <p>为什么小模型配合更多推理时搜索，有时候能追上大模型？一篇讲清推理时算力和效果提升之间，到底是什么样的定量关系。</p>
+                    </a>
+                    <a href="mcts-tree-search.html" class="article-card">
+                        <div class="article-icon">🌳</div>
+                        <h3>MCTS / Tree Search</h3>
+                        <p>为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。</p>
+                    </a>
+                    <a href="rlvr.html" class="article-card">
+                        <div class="article-icon">🎯</div>
+                        <h3>RLVR</h3>
+                        <p>为什么训练推理模型不用人类偏好打分，改用"答案对不对"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
+                    </a>
+                    <a href="world-model.html" class="article-card">
+                        <div class="article-icon">🌍</div>
+                        <h3>World Model</h3>
+                        <p>为什么生成一段逼真的视频，不代表模型真的理解物理规律？一篇讲清"世界模型"这个概念在讨论什么，以及为什么这个问题目前还没有定论。</p>
+                    </a>
+                    <a href="agent-memory.html" class="article-card">
+                        <div class="article-icon">🧷</div>
+                        <h3>Agent Memory</h3>
+                        <p>为什么带记忆功能的 Agent 有时候会"记错"、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。</p>
+                    </a>
+                    <a href="multimodal-agent.html" class="article-card">
+                        <div class="article-icon">🖇️</div>
+                        <h3>Multimodal Agent</h3>
+                        <p>为什么模型能"看图说话"，不代表它能成为可用的多模态 Agent？一篇讲清"能看见、能看懂、能行动"之间隔着的那几层工程鸿沟。</p>
+                    </a>
+                    <a href="a2a.html" class="article-card">
+                        <div class="article-icon">🤝</div>
+                        <h3>A2A</h3>
+                        <p>Agent 之间的通用语言：Google 主导、Linux Foundation 托管的 Agent-to-Agent 协议到底是什么？</p>
+                    </a>
+                    <a href="mcp-evolution.html" class="article-card">
+                        <div class="article-icon">🔌</div>
+                        <h3>MCP Evolution</h3>
+                        <p>月下载 11 亿次的 MCP，为什么 2026 年开始从神器变成 Agent 的瓶颈？</p>
+                    </a>
+                    <a href="long-thinking.html" class="article-card">
+                        <div class="article-icon">💭</div>
+                        <h3>Long Thinking</h3>
+                        <p>让 AI 学会该快时快、该慢时慢、该停时停——Test-Time Compute 的终极形态，是智商税还是新边疆？</p>
+                    </a>
                 </div>
             </section>
         </main>
