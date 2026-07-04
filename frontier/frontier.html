@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!-- Frontier & Emerging Research 专题页：0 篇，内容建设中 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontier & Emerging Research · kipozannaki</title>
+    <meta name="description" content="AI 前沿研究：推理范式、Test-Time Compute、Agent 记忆与协作协议">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <section class="hero-compact">
+        <h1>Frontier & Emerging Research</h1>
+        <p>AI 前沿研究：跟着论文走 · 0 篇笔记（内容建设中）</p>
+    </section>
+
+    <div class="site-layout">
+        <aside class="sidebar">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="展开/收起导航" aria-label="展开或收起导航">›</button>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📂 专题</h3>
+                <a href="../application/application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
+                <a href="../foundation/foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
+                <a href="frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 本专题文章</h3>
+                <p class="sidebar-empty">暂无文章，敬请期待</p>
+            </div>
+        </aside>
+
+        <main>
+            <section class="section">
+                <h2>🔭 专题说明</h2>
+                <p>这一专题不追求体系完整，追求跟得上节奏——聚焦"AI 现在最前沿在探索什么"，内容会跟着最新论文和产业动态持续更新，不像 Application / Foundation 两个专题那样有一套稳定不变的知识体系：</p>
+                <ul>
+                    <li><strong>推理范式的工程实现</strong>　o1 / r1 这类具体推理模型是怎么被训练和部署出来的</li>
+                    <li><strong>算力换智能</strong>　Test-Time Compute、Inference Scaling，把"多算一会儿"变成一种可以量化的能力提升手段</li>
+                    <li><strong>搜索与规划</strong>　Tree Search、MCTS 在生成式模型里的具体应用</li>
+                    <li><strong>新的训练信号</strong>　RLVR（可验证奖励的强化学习）这类正在被验证的对齐新思路</li>
+                    <li><strong>超越单轮问答</strong>　World Model、Agent Memory，让模型具备更长时间尺度的状态和推演能力</li>
+                    <li><strong>多模态与协作协议</strong>　Multimodal Agent、A2A、MCP Evolution，模型之间、模态之间怎么互相协作</li>
+                </ul>
+                <p class="note"><strong>一个需要先说清楚的边界</strong>：Foundation 专题里有一篇 Reasoning，讲的是"为什么模型能/不能推理"这种机制层面的问题；这里的 <strong>Reasoning Model</strong> 讲的是 o1 / r1 这类具体推理范式，工程上到底是怎么被训练和实现出来的——两篇不是同一件事，各自讲各自的层次。</p>
+            </section>
+
+            <section class="section">
+                <h2>📚 本专题文章</h2>
+                <p>内容持续更新中，规划中的篇目（按写作顺序排列）：</p>
+                <div class="planned-articles">
+                    <span class="planned-item">Reasoning Model</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">Test-Time Compute</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">Inference Scaling</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">MCTS / Tree Search</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">RLVR</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">World Model</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">Agent Memory</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">Multimodal Agent</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">A2A</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">MCP Evolution</span>
+                    <span class="planned-arrow">→</span>
+                    <span class="planned-item">Long Thinking</span>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+
+    <script>
+    (function() {
+        const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级 */ } };
+
+        const savedTheme = safeGet('theme');
+        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (sysDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        if (safeGet('reading') === '1') document.body.classList.add('reading-mode');
+        if (safeGet('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
+
+        const themeBtn = document.getElementById('theme-toggle');
+        const readBtn = document.getElementById('reading-toggle');
+        const sideBtn = document.getElementById('sidebar-toggle');
+        if (theme === 'dark') themeBtn.classList.add('active');
+        if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+
+        themeBtn.addEventListener('click', function() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            themeBtn.classList.toggle('active');
+            safeSet('theme', next);
+        });
+        readBtn.addEventListener('click', function() {
+            document.body.classList.toggle('reading-mode');
+            const on = document.body.classList.contains('reading-mode');
+            readBtn.classList.toggle('active');
+            safeSet('reading', on ? '1' : '0');
+        });
+        sideBtn.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-open');
+            const on = document.body.classList.contains('sidebar-open');
+            safeSet('sidebarOpen', on ? '1' : '0');
+        });
+    })();
+    </script>
+</body>
+</html>
