@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Memory · kipozannaki</title>
-    <meta name="description" content="为什么带记忆功能的 Agent 有时候会"记错"、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。">
+    <meta name="description" content="为什么带记忆功能的 Agent 有时候会&quot;记错&quot;、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。">
     <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
     <script>
     (function() {
@@ -35,7 +35,7 @@
     <article class="article-page">
         <header class="article-header">
             <h1>🧷 Agent Memory</h1>
-            <p class="meta">为什么带记忆功能的 Agent 有时候会"记错"、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。</p>
+            <p class="meta">为什么带记忆功能的 Agent 有时候会&quot;记错&quot;、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。</p>
         </header>
         <div class="article-body">
 
@@ -62,13 +62,7 @@ Frontier：Multimodal Agent（下一篇：多模态能力和 Agent 结合）</co
                 <li>跟未来 Application 专题可能会写的 Memory Engineering 的区别——本篇讨论的是记忆机制本身的设计原理（什么该记、怎么组织、怎么检索、怎么遗忘），如果后续 Application 专题写 Memory Engineering，会讲"开发者具体怎么在生产系统里落地实现记忆功能"这种工程做法——一个是机制原理，一个是工程落地，提前说清楚避免以后重复。</li>
             </ul>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>相关概念</th>
-                        <th>跟 Agent Memory 的关系</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>相关概念</th><th>跟 Agent Memory 的关系</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td>Foundation · Embedding</td>
@@ -84,14 +78,7 @@ Frontier：Multimodal Agent（下一篇：多模态能力和 Agent 结合）</co
             <h2 id="why">为什么不能只靠更长的 Context Window？</h2>
             <p>一个直觉的想法：既然想让 Agent"记住"更多东西，干脆把 Context Window 做得无限长，把所有历史对话都塞进去，不就自然记住了？</p>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>方案</th>
-                        <th>怎么做</th>
-                        <th>致命问题</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>方案</th><th>怎么做</th><th>致命问题</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td>无限拉长 Context Window</td>
