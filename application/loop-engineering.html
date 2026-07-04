@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loop Engineering · kipozannaki</title>
+    <meta name="description" content="Loop Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+        </nav>
+    </header>
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🔁 Loop Engineering 工业级落地</h1>
+            <p class="meta">从"单次任务优化"到"长期自主调度系统" · 双栖科普</p>
+        </header>
+        <div class="article-body">
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">五大组件</a> · <a href="#anli">真实案例</a> · <a href="#shizhan">实战避坑</a> · <a href="#jiecie">与 Harness/Workflow 的衔接</a> · <a href="#jieyu">结语</a></p>
+            <h2 id="intro">一、引言：从工具到员工的关键一跃</h2>
+            <p><strong>工具</strong>需要人按开关。<strong>员工</strong>自己会看时间表、自己检查质量、干不好知道找谁报告。</p>
+            <p>前面六篇讲的是"怎么让 AI 干好一次任务"——给它手脚（Agent）、给它专业知识（Skill）、给它安全带（Harness Engineering）、给它干净的工作台（Context Engineering）、给它清楚的说明书（Prompt Engineering）。这些都是<strong>单次任务内的优化</strong>，还是得有人来按"开始"按钮。</p>
+            <p><strong>Loop Engineering 要做的完全不同</strong>：设计一个<strong>持续运行、按计划触发、自我验证、知道什么时候该停、什么时候该交给人的调度系统</strong>。</p>
+            <blockquote>💡 <strong>Loop Engineering 的终极问题不是"怎么让它跑"，而是"怎么让它知道什么时候该停"。</strong></blockquote>
+            <h2 id="zuobiao">二、Loop Engineering 在工程体系里的坐标</h2>
+            <table>
+                <thead><tr><th></th><th>手动触发</th><th>自动化 Workflow</th><th>Loop 调度系统</th></tr></thead>
+                <tbody>
+                    <tr><td>启动方式</td><td>人点按钮</td><td>外部事件触发</td><td>定时 + 事件 + 条件，自主判断何时启动</td></tr>
+                    <tr><td>一次运行后</td><td>人看结果、人决定下一步</td><td>返回结果给上游系统</td><td>自己验证、自己决策、自己重试或交人</td></tr>
+                    <tr><td>适用场景</td><td>一次性任务、探索</td><td>响应式处理</td><td>持续监控、周期性任务、长期自主运行</td></tr>
+                </tbody>
+            </table>
+            <h2 id="zujian">三、拆开一个 Loop：五大组件</h2>
+            <h3>3.1 触发器（Trigger）</h3>
+            <p><strong>定时触发（Cron）</strong>、<strong>事件触发（Webhook）</strong>、<strong>条件触发</strong>（基于上次运行结果）。兜底检查："上次运行是什么时候？超过预期间隔则告警。"</p>
+            <h3>3.2 执行器（Executor）</h3>
+            <p>负责启动 Workflow 实例：串行还是并行？资源隔离？超时控制？</p>
+            <h3>3.3 验证器（Validator）</h3>
+            <p><strong>验证必须独立于执行，不让 Workflow 自己判断自己。</strong>规则验证 / 测试验证 / 一致性验证 / 人工验证 / 模型验证。</p>
+            <h3>3.4 决策器（Decider）</h3>
+            <table>
+                <thead><tr><th>验证结果</th><th>决策类型</th><th>动作</th></tr></thead>
+                <tbody>
+                    <tr><td>通过</td><td>成功终止</td><td>记录成功，停</td></tr>
+                    <tr><td>不通过，可重试</td><td>重试</td><td>修改条件再启动</td></tr>
+                    <tr><td>不通过，不可重试</td><td>降级</td><td>缩小范围再试</td></tr>
+                    <tr><td>连续 N 次不通过</td><td>交人</td><td>创建 Issue 通知人工</td></tr>
+                </tbody>
+            </table>
+            <h3>3.5 状态持久化（State）</h3>
+            <p>运行历史、重试计数、问题模式库、性能指标、处理进度。</p>
+            <h2 id="anli">四、真实案例：代码库的持续审查 Loop</h2>
+            <pre><code>[Loop Trigger]
+  每 6 小时检查一次 GitLab
+  或 GitLab webhook 触发
+           │
+           ▼
+[Executor] 启动审查 Workflow 实例
+           │
+           ▼
+[Validator] Schema 验证 + 一致性验证 + 测试验证
+           │
+           ├─ 全通过 ──→ [Decider] 成功终止
+           └─ 失败 ──→ [Decider] 重试或交人</code></pre>
+            <h2 id="shizhan">五、实战避坑：两个"血泪翻车现场"</h2>
+            <h3>坑一：没有终止条件，Loop 变成了"永动机"</h3>
+            <p>四种终止条件缺一不可：成功终止 / 失败终止 / 超时终止 / 资源终止。</p>
+            <blockquote>💡 <strong>没有终止条件的 Loop 不是自动化，是自动化灾难。</strong></blockquote>
+            <h3>坑二："Loop 级"失败被当成"Workflow 级"失败处理</h3>
+            <p>触发器失效、验证器有 bug、决策器死循环、状态损坏——这些是 Loop 级的问题，需要单独的"健康检查"逻辑。</p>
+            <h2 id="jiecie">六、Loop / Workflow / Harness 的层级关系</h2>
+            <table>
+                <thead><tr><th></th><th>Harness</th><th>Workflow</th><th>Loop</th></tr></thead>
+                <tbody>
+                    <tr><td>时间维度</td><td>单次 Agent 运行内</td><td>单次运行的多步骤编排</td><td>跨多次运行的调度和决策</td></tr>
+                    <tr><td>核心问题</td><td>Agent 怎么安全地自主行动？</td><td>多个步骤怎么连成一条链？</td><td>多次运行怎么协调、什么时候停？</td></tr>
+                    <tr><td>失败处理</td><td>单步骤出错怎么办</td><td>某个实例失败怎么办</td><td>多次都失败了怎么办</td></tr>
+                </tbody>
+            </table>
+            <h2 id="jieyu">七、结语：八块拼图拼完</h2>
+            <p><strong>给小白的话</strong>：Workflow 让 AI 能连续干一串事情。Loop 让 AI 能一直干下去——不用你每次手动点"开始"。</p>
+            <p><strong>给开发者的话</strong>：Loop 层是 AI 系统从"工具"变成"员工"的关键一跃。最难的部分不是"怎么让它跑起来"，而是"怎么让它知道什么时候该停"。</p>
+            <table>
+                <thead><tr><th>层级</th><th>涉及的概念</th><th>解决什么问题</th></tr></thead>
+                <tbody>
+                    <tr><td>底层基础</td><td>Transformer / 预训练 / Tokenization / RLHF</td><td>模型本身怎么造出来的</td></tr>
+                    <tr><td>单次优化层</td><td>Prompt / Context / Harness / Agent / Skill</td><td>让一次任务做好</td></tr>
+                    <tr><td>持续运行层</td><td>Loop Engineering</td><td>让任务一直做下去、知道什么时候停</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>没有 Loop，AI 系统始终是工具。有了 Loop，它才开始有"自主意识"。</strong></blockquote>
+            <p class="refs"><strong>参考资料</strong>：<a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">kipozannaki/RELOO</a></p>
+            <nav class="article-nav">
+                <a href="workflow-engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">⚙️ Workflow Engineering</span>
+                    </span>
+                </a>
+            </nav>
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
