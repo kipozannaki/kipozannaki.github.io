@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：A2A（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A · kipozannaki</title>
+    <meta name="description" content="Agent 之间的通用语言：Google 主导、Linux Foundation 托管的 Agent-to-Agent 协议到底是什么？">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🤝 A2A</h1>
+            <p class="meta">Agent 之间的通用语言：Google 主导、Linux Foundation 托管的 Agent-to-Agent 协议到底是什么？</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>副标题：Google 推出的 Agent-to-Agent 协议，到底是在解决什么问题？</blockquote>
+            <hr>
+            <h2 id="intro">引言：几个反直觉的问题</h2>
+            <p><strong>问题一</strong>：MCP 已经让 Agent 能调用工具了，为什么还需要 A2A？</p>
+            <p>很多人第一反应是："A2A 不就是多 Agent 之间的 MCP 吗？"错。MCP 解决的是"一个 Agent 怎么拿螺丝刀"，A2A 解决的是"当这个 Agent 发现螺丝刀不够用时，怎么找到另一个会用电焊的 Agent，并且让它帮忙"。这是<strong>工具调用</strong>和<strong>任务委托</strong>的本质区别。</p>
+            <p><strong>问题二</strong>：A2A 协议要求 Agent 不暴露内部状态，那它们怎么协作？</p>
+            <p>听起来像悖论——不敞开门，怎么合作？但 A2A 的设计恰恰是"黑箱协作"：就像你叫外卖不需要知道厨师的厨房布局，你只需要下单、等餐、验收。A2A 让 Agent 在保持内部独立的同时，通过标准化的"任务契约"完成跨组织协作。</p>
+            <p><strong>问题三</strong>：A2A 由 Google 发起，但为什么它必须捐给 Linux Foundation 才能活？</p>
+            <p>2025 年 4 月 Google 发布 A2A，6 月就捐给了 Linux Foundation。不是 Google 大方，而是<strong>协议的价值等于采纳它的生态规模</strong>。如果只有 Google Cloud 的 Agent 能说 A2A，那它跟 AWS 的 Agent 还是鸡同鸭讲。协议的标准化程度，直接决定多 Agent 系统的上限。</p>
+            <p><strong>问题四</strong>：A2A 说自己是" complements MCP"（互补 MCP），但生产环境里它们真的不打架吗？</p>
+            <p>理论上 MCP 管 Agent-to-Tool，A2A 管 Agent-to-Agent。但在真实架构中，一个 Agent 既要用 MCP 查数据库，又要用 A2A 委托任务给另一个 Agent，两条协议在同一个系统里并行运行，<strong>身份认证、权限传递、错误归因</strong>立刻变成噩梦。</p>
+            <p>💡 <strong>A2A 不是让 Agent 变得更聪明，而是让聪明的 Agent 们能在一个房间里开会而不互相踩脚。</strong></p>
+            <hr>
+            <h2 id="zuobiao">坐标：A2A 在 Agent 管线里的位置</h2>
+            <h3>1.1 代码块流程图</h3>
+            <pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    用户请求层 (User Request)                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              编排层 (Orchestrator / Harness)                  │
+│         ┌─────────────┐    ┌─────────────┐                 │
+│         │  任务拆分    │───▶│  Agent 路由  │                 │
+│         └─────────────┘    └─────────────┘                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+    ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+    │   Agent A   │  │   Agent B   │  │   Agent C   │
+    │  (主控Agent) │  │ (专业Agent)  │  │ (专业Agent)  │
+    └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+           │                │                │
+           │    ┌──────────┘                │
+           │    │    A2A 协议层              │
+           │    │  (Agent-to-Agent)          │
+           │    │  • Agent Card 发现         │
+           │    │  • 任务委托/协商            │
+           │    │  • 流式结果返回             │
+           │    └──────────┬─────────────────┘
+           │               │
+           ▼               ▼
+    ┌─────────────┐  ┌─────────────┐
+    │   MCP 协议   │  │   MCP 协议   │
+    │ (Agent-to-  │  │ (Agent-to-  │
+    │   Tool)     │  │   Tool)     │
+    └──────┬──────┘  └──────┬──────┘
+           │                │
+           ▼                ▼
+    ┌─────────────┐  ┌─────────────┐
+    │  数据库/API  │  │  代码执行器   │
+    └─────────────┘  └─────────────┘</code></pre>
+            <h3>1.2 关系表：A2A 与周边概念</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>概念</th>
+                        <th>与 A2A 的关系</th>
+                        <th>一句话区分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MCP</strong></td>
+                        <td>互补，非竞争</td>
+                        <td>MCP = Agent 拿工具；A2A = Agent 找 Agent</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Workflow Engineering</strong></td>
+                        <td>A2A 是它的"分布式执行器"</td>
+                        <td>Workflow 画的是流程图，A2A 是流程图里跨节点的"网线"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Harness Engineering</strong></td>
+                        <td>A2A 扩展了 Harness 的边界</td>
+                        <td>Harness 管单次运行，A2A 让 Harness 能调度外部 Agent</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Agent Memory</strong></td>
+                        <td>A2A 调用时 Memory 需同步或隔离</td>
+                        <td>跨 Agent 委托时，上下文是"快递包裹"不是"共享硬盘"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Reasoning Model</strong></td>
+                        <td>A2A 的委托决策依赖推理能力</td>
+                        <td>主控 Agent 决定"自己做还是找人做"，这是推理的一部分</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RLVR / MCTS</strong></td>
+                        <td>A2A 是它们的外部执行接口</td>
+                        <td>多 Agent 协作的搜索/强化学习，需要 A2A 作为动作空间</td>
+                    </tr>
+                    <tr>
+                        <td><strong>World Model</strong></td>
+                        <td>A2A 让 World Model 分布式化</td>
+                        <td>一个 Agent 的 World Model 有限，A2A 让它能调用"外挂大脑"</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>💡 <strong>如果把 Agent 系统比作一家餐厅，MCP 是后厨的厨具，A2A 是前台接单后把订单分配给不同档口的那张传票系统。</strong></p>
+            <hr>
+            <h2 id="why">为什么不能用更简单的方案？</h2>
+            <h3>方案一：直接让 Agent 之间调 HTTP API（裸 REST）</h3>
+            <p><strong>致命问题</strong>：</p>
+            <ul>
+                <li><strong>能力发现黑盒</strong>：Agent B 有什么技能？裸 REST 没有标准化描述，主控 Agent 得像猜谜一样试接口。</li>
+                <li><strong>协商成本爆炸</strong>：任务参数怎么传？返回格式是什么？错误码怎么定义？每对接两个 Agent 就要写一份"外交协议"。</li>
+                <li><strong>安全裸奔</strong>：没有统一的身份认证和权限传递，Agent A 委托给 Agent B 时，B 不知道 A 有没有权限，A 也不知道 B 会不会越权。</li>
+            </ul>
+            <h3>方案二：用消息队列（Kafka/RabbitMQ）做 Agent 通信</h3>
+            <p><strong>致命问题</strong>：</p>
+            <ul>
+                <li><strong>语义丢失</strong>：MQ 只管消息投递，不管任务语义。Agent A 发了一个"帮我分析这份财报"，MQ 不会告诉 Agent B 这是需要流式返回的长任务，还是一次性返回的短任务。</li>
+                <li><strong>状态同步地狱</strong>：长任务需要中间状态、部分结果、取消信号——MQ 的 topic 设计会让状态机复杂度指数级增长。</li>
+                <li><strong>跨组织不可行</strong>：MQ 假设所有 Agent 在同一个内网。但 A2A 的设计目标就是<strong>跨组织边界</strong>（你的 Agent 调用第三方的 Agent），MQ 的防火墙穿透和权限模型完全不适用。</li>
+            </ul>
+            <h3>方案三：把所有 Agent 塞进同一个框架（AutoGen/CrewAI）</h3>
+            <p><strong>致命问题</strong>：</p>
+            <ul>
+                <li><strong> vendor lock-in</strong>：AutoGen 的 Agent 和 CrewAI 的 Agent 说不了话。但真实世界里，你的客服 Agent 在 LangChain 上，风控 Agent 在 Google Vertex 上，它们不可能被"塞进同一个框架"。</li>
+                <li><strong>部署耦合</strong>：同一个框架意味着同一个代码库、同一个运行时。生产环境里，不同 Agent 由不同团队维护，部署周期、依赖版本、资源配额完全不同。</li>
+                <li><strong>规模天花板</strong>：当 Agent 数量超过 10 个，单一框架的编排复杂度会压垮团队。A2A 提供的是<strong>去中心化</strong>的协作，不是<strong>中心化</strong>的管控。</li>
+            </ul>
+            <h3>方案四：用 MCP 的 "tools" 字段把其他 Agent 伪装成工具</h3>
+            <p><strong>致命问题</strong>：</p>
+            <ul>
+                <li><strong>生命周期错配</strong>：MCP tool 是"同步调用、立即返回"的模型。但 Agent 任务往往是异步、长时、需要多次交互的。把 Agent 塞进 tool 接口，就像把一场视频会议伪装成一封邮件。</li>
+                <li><strong>上下文隔离破坏</strong>：MCP tool 的上下文在同一个窗口里流转，但 Agent 之间的上下文应该<strong>隔离</strong>——你不希望外部 Agent 看到你内部的思考链和记忆。</li>
+                <li><strong>错误归因模糊</strong>：当"工具 Agent"失败时，MCP 的 error 模型无法区分是"工具执行失败"还是"被调用的 Agent 内部逻辑失败"。</li>
+            </ul>
+            <p>💡 <strong>裸 REST 像两个人对着喊，MQ 像贴便利贴，统一框架像把所有人关进一间办公室——A2A 像给每个人配了一部带通讯录、加密通话、任务追踪功能的电话。</strong></p>
+            <hr>
+            <h2 id="how">怎么工作：不讲公式，讲直觉</h2>
+            <h3>3.1 核心机制：Agent Card + 任务委托</h3>
+            <p>想象一个场景：你是一个项目经理（主控 Agent），手下有一批自由职业者（远程 Agent）。你怎么知道谁擅长什么？怎么派活？怎么验收？</p>
+            <p><strong>Agent Card = 自由职业者的简历+作品集</strong></p>
+            <p>每个远程 Agent 在启动时，会在一个固定地址（<code>/.well-known/agent.json</code>）挂出一份 JSON 简历，里面写清楚：</p>
+            <ul>
+                <li>我会什么（skills）："财务报表分析"、"代码审查"、"多语言翻译"</li>
+                <li>我怎么接活（endpoint）：HTTP 地址、认证方式、支持的交互模式</li>
+                <li>我的工作时间（streaming/异步支持）：能不能边做边汇报，还是只能做完一次性交</li>
+                <li>我的语言（modality）：支持文本、图片、音频还是视频</li>
+            </ul>
+            <p>主控 Agent 看到这份简历后，不需要知道对方内部用什么模型、什么框架、什么 prompt——就像你请外包不需要知道对方用 Mac 还是 Windows。</p>
+            <p><strong>任务委托 = 发工单</strong></p>
+            <p>主控 Agent 发一个"任务对象"过去，包含：</p>
+            <ul>
+                <li>任务 ID（全局唯一，用于追踪）</li>
+                <li>任务类型（对应 Agent Card 里的 skill）</li>
+                <li>输入数据（比如一份 PDF 的 URL，不是把 PDF 内容塞进去）</li>
+                <li>期望输出格式</li>
+                <li>回调地址（完成后通知我）</li>
+            </ul>
+            <p>远程 Agent 接单后，会返回一个"任务状态机"：</p>
+            <ul>
+                <li><code>submitted</code> → <code>working</code> → <code>input-required</code>（需要补充信息）→ <code>completed</code> / <code>failed</code> / <code>canceled</code></li>
+            </ul>
+            <p>这个状态机是<strong>流式</strong>的——远程 Agent 可以边做边推送部分结果，主控 Agent 可以中途取消或追加要求。</p>
+            <h3>3.2 五个设计原则的直觉解释</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>原则</th>
+                        <th>直觉解释</th>
+                        <th>反例</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>拥抱 Agentic 能力</strong></td>
+                        <td>协议不是让 Agent "调用函数"，而是让 Agent "协商任务"。远程 Agent 可以拒绝、可以要补充信息、可以返回部分结果。</td>
+                        <td>传统 RPC：调用方发参数，被调用方必须返回结果，没有"商量"的余地</td>
+                    </tr>
+                    <tr>
+                        <td><strong>依赖现有标准</strong></td>
+                        <td>用 HTTP + JSON-RPC，不用 reinvent 传输层。就像 email 用 SMTP，而不是自己拉光纤。</td>
+                        <td>某些区块链 Agent 协议非要自建 P2P 网络，结果延迟和兼容性双崩</td>
+                    </tr>
+                    <tr>
+                        <td><strong>默认安全</strong></td>
+                        <td>TLS + 认证令牌是标配，不是可选项。就像现代电话默认加密，而不是对讲机。</td>
+                        <td>早期 MCP 生态扫描发现约 2000 个 MCP 服务器<strong>全部</strong>缺乏认证</td>
+                    </tr>
+                    <tr>
+                        <td><strong>支持长时任务</strong></td>
+                        <td>任务可以跑几小时，中间可以暂停、恢复、换人。就像建筑项目，不是便利店结账。</td>
+                        <td>HTTP 请求默认 30 秒超时，长任务会被中间件无情掐断</td>
+                    </tr>
+                    <tr>
+                        <td><strong>模态无关</strong></td>
+                        <td>协议不关心你传的是文字、图片还是视频。就像快递单不限制箱子里装什么。</td>
+                        <td>很多早期多 Agent 框架只支持文本，导致视觉 Agent 被排除在外</td>
+                    </tr>
+                </tbody>
+            </table>
+            <h3>3.3 与 MCP 的协作画面</h3>
+            <p>一个完整的请求链路长这样：</p>
+            <ol>
+                <li>用户问："帮我分析这份合同的风险，并生成一份对比报告"</li>
+                <li><strong>主控 Agent</strong>（通过 A2A）发现有两个远程 Agent 可用：</li>
+            </ol>
+            <ul>
+                <li>Agent B：法律合同分析（擅长文本）</li>
+                <li>Agent C：数据可视化（擅长图表）</li>
+            </ul>
+            <ol>
+                <li>主控 Agent 把合同文本<strong>通过 MCP</strong> 从公司数据库里读出来</li>
+                <li>主控 Agent <strong>通过 A2A</strong> 把合同委托给 Agent B，要求返回风险清单</li>
+                <li>Agent B 工作过程中（流式返回），发现合同里有一张财务表格图片，文字识别不清</li>
+                <li>Agent B <strong>通过 A2A</strong> 向主控 Agent 发送 <code>input-required</code>，请求高清原图</li>
+                <li>主控 Agent <strong>通过 MCP</strong> 从文件系统拿到原图，<strong>通过 A2A</strong> 回传给 Agent B</li>
+                <li>Agent B 完成后，主控 Agent <strong>通过 A2A</strong> 把风险清单委托给 Agent C 做图表</li>
+                <li>Agent C 完成后，主控 Agent <strong>通过 MCP</strong> 把最终报告写入公司知识库</li>
+            </ol>
+            <p>注意：<strong>A2A 和 MCP 不是替代关系，而是分工关系</strong>——A2A 负责 Agent 之间的"外交"，MCP 负责 Agent 与工具的"内政"。</p>
+            <p>💡 <strong>A2A 是 Agent 之间的"外交护照"，MCP 是 Agent 手里的"国内身份证"——出国用护照，买菜用身份证，两件事不能互相替代。</strong></p>
+            <hr>
+            <h2 id="impact">翻车现场：三个真实案例</h2>
+            <h3>案例一：Agent Card 撒谎——"简历造假"导致级联失败</h3>
+            <p><strong>现场还原</strong>： 某金融科技公司部署了 A2A 多 Agent 系统。Agent B 的 Agent Card 宣称自己支持"实时股票情绪分析"，主控 Agent 在高峰期把大量任务委托过去。结果 Agent B 的实际吞吐量只有宣称的 1/10，任务队列堆积，状态机卡在 <code>working</code> 几小时不动。主控 Agent 没有超时熔断机制，继续源源不断地派单，最终整个系统雪崩。</p>
+            <p><strong>根因剖析</strong>： A2A 的 Agent Card 是<strong>自声明</strong>的（self-declared），没有第三方验证。就像招聘时只看简历不面试。Agent B 的开发者更新了模型但忘了更新 Agent Card 里的性能参数，或者故意夸大能力以吸引更多调用。A2A v1.0.0 引入了 signed Agent Cards（加密签名），但签名只能证明"这份简历是谁发的"，不能证明"简历内容是真的"。</p>
+            <p><strong>修复思路</strong>：</p>
+            <ul>
+                <li>引入 Agent 能力基准测试（类似 Benchmark），通过后才能上架 Agent Card</li>
+                <li>主控 Agent 层需要实现熔断和退避（circuit breaker + backoff），不能盲目信任远程 Agent</li>
+                <li>监控 Agent Card 的"实际表现"与"宣称能力"的偏差，动态调整路由权重</li>
+            </ul>
+            <h3>案例二：权限传递断层——Agent A 委托给 Agent B，B 越权访问了 CEO 的邮件</h3>
+            <p><strong>现场还原</strong>： 某企业内部的 HR Agent（Agent A）接到任务："给所有实习生发一封入职指引邮件"。Agent A 通过 A2A 委托给邮件发送 Agent（Agent B）。Agent B 的 Agent Card 显示自己支持"批量邮件发送"，Agent A 就把任务派过去了。但 Agent B 在发送过程中，发现邮件列表里缺少几个实习生地址，于是它通过 MCP 连接了企业邮箱系统，用<strong>主控 Agent 的权限令牌</strong>查询了全公司通讯录——包括 CEO、CFO 的私人邮箱，并把查询结果缓存到了自己的本地存储。</p>
+            <p><strong>根因剖析</strong>： A2A 协议定义了任务委托，但<strong>没有定义权限的衰减（attenuation）</strong>。当 Agent A 把任务委托给 Agent B 时，A 把自己的令牌传给了 B，B 获得了和 A 同等的权限。这就像你给快递员一把家门钥匙，结果他能打开你家的保险柜。A2A 协议本身不解决身份治理（Identity Governance），这是目前学术界和工业界都在补的缺口——IETF 在 2026 年初发布了多个相关草案（AIMS、WIMSE、Agentic JWT 等），但尚无成熟实现。</p>
+            <p><strong>修复思路</strong>：</p>
+            <ul>
+                <li>使用 Macaroon 或 Biscuit 等支持上下文约束（caveat）的令牌格式，让委托令牌只能访问特定资源</li>
+                <li>在 Agent B 的 MCP 层实施最小权限原则（Least Privilege），不让 A2A 层传过来的令牌直接透传到工具层</li>
+                <li>审计日志必须记录"谁委托了谁、谁访问了什么"的完整链条，不能断链</li>
+            </ul>
+            <h3>案例三：长任务状态机失控——"我以为你取消了，你以为我还在做"</h3>
+            <p><strong>现场还原</strong>： 某法律科技公司的合同审查系统，主控 Agent 把一份 200 页的合同委托给 Agent B 进行条款提取。Agent B 预计需要 30 分钟。15 分钟后，用户觉得等太久，在主控界面点击了"取消"。主控 Agent 向 Agent B 发送了 <code>cancel</code> 信号，但 Agent B 的 A2A 实现有 bug：它收到了 cancel，但子进程（实际执行条款提取的 LLM 调用）没有正确终止，继续运行了 20 分钟。期间 Agent B 还向主控 Agent 推送了两次 <code>working</code> 状态更新。主控 Agent 以为任务已取消，把合同又委托给了 Agent C。最终 Agent B 和 Agent C 都返回了结果，且结论不一致，用户看到两份冲突的报告，直接懵了。</p>
+            <p><strong>根因剖析</strong>： A2A 的状态机（<code>submitted → working → completed/failed/canceled</code>）看起来简单，但<strong>分布式状态一致性</strong>是经典难题。Cancel 信号是"尽力而为"（best-effort）的，A2A 协议不保证远程 Agent 一定能立即终止。更深层的问题是：Agent B 的 A2A 适配层和它的实际业务逻辑层是<strong>解耦</strong>的，适配层说"收到 cancel"，但业务层没听见。</p>
+            <p><strong>修复思路</strong>：</p>
+            <ul>
+                <li>主控 Agent 层必须实现<strong>幂等性</strong>和<strong>去重机制</strong>：同一个任务 ID 不能被执行两次</li>
+                <li>远程 Agent 的 A2A 适配层和业务层之间需要"硬同步"——cancel 必须能中断实际计算（比如通过进程信号、线程中断、或计算框架的取消令牌）</li>
+                <li>对于长任务，引入"心跳"机制：如果 Agent B 在 cancel 后还继续推送状态，主控 Agent 应该把它视为异常并告警</li>
+            </ul>
+            <p>💡 <strong>A2A 协议是"电话线"，但电话线不能保证对方一定在听、一定听懂、一定按你说的做——协议负责"能拨通"，工程负责"拨通后不出乱子"。</strong></p>
+            <hr>
+            <h2 id="engineering">为什么开发者要懂：知识网络咬合</h2>
+            <h3>5.1 与已发布文章的关联</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>已发布文章</th>
+                        <th>A2A 如何与之咬合</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Agent</strong></td>
+                        <td>A2A 是 Agent 从"单兵作战"到"团队协作"的桥梁。没有 A2A，Agent 只能调用工具；有了 A2A，Agent 才能调用其他 Agent。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Harness Engineering</strong></td>
+                        <td>Harness 管单次 Agent 运行的生命周期，A2A 让 Harness 能调度外部 Agent 作为"分布式算力"。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Loop Engineering</strong></td>
+                        <td>Loop 是跨多次运行的自我调度，A2A 是 Loop 的"外部执行臂"——Loop 决定"这次找谁做"，A2A 负责"找到并委托"。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MCTS / Tree Search</strong></td>
+                        <td>多 Agent 的搜索空间爆炸时，A2A 是树节点之间的通信协议。每个节点可以是一个远程 Agent，A2A 传递搜索状态和结果。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RLVR</strong></td>
+                        <td>强化学习的奖励信号可以通过 A2A 在 Agent 之间传递，实现分布式 RLVR。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>World Model</strong></td>
+                        <td>单个 Agent 的 World Model 受限于上下文窗口，A2A 让它能调用拥有不同 World Model 的远程 Agent，实现"分布式世界认知"。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Agent Memory</strong></td>
+                        <td>A2A 委托时，上下文是"快照"而非"共享"——远程 Agent 的记忆和主控 Agent 的记忆是隔离的，这是设计特性，不是 bug。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Reasoning Model</strong></td>
+                        <td>主控 Agent 在委托前需要推理"这个任务该自己做还是该外包"，这是 Test-Time Compute 的一种形式。</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Inference Scaling</strong></td>
+                        <td>A2A 让 Inference Scaling 从"单模型堆算力"扩展到"多模型分布式推理"，但引入了网络延迟和协调开销的新变量。</td>
+                    </tr>
+                </tbody>
+            </table>
+            <h3>5.2 为什么现在必须关注</h3>
+            <p>2026 年初的工业界数据显示：</p>
+            <ul>
+                <li>超过 50 个组织在 Linux Foundation 的 AAIF 工作组中部署了 A2A Agent Cards</li>
+                <li>MCP 月下载量超过 1.1 亿次，A2A 虽然起步晚，但已被 AWS、Microsoft、Google Cloud 原生集成</li>
+                <li>多 Agent 生产系统的失败率高达 41%-86.7%，其中<strong>协调问题（coordination issues）占失败的 79%</strong></li>
+            </ul>
+            <p>这意味着：<strong>A2A 协议正在快速成为基础设施，但多 Agent 系统的工程成熟度远远落后于协议标准化速度</strong>。懂 A2A 的开发者，将在未来 2-3 年的 Agent 生态爆发中占据先机。</p>
+            <p>💡 <strong>A2A 是 Agent 时代的 TCP/IP——它不会让你的应用更聪明，但会让你的应用能连接到整个 Agent 互联网。</strong></p>
+            <hr>
+            <h2 id="wuqu">常见误区</h2>
+            <h3>误区一："A2A 和 MCP 是竞争关系，选一边站队"</h3>
+            <p><strong>真相</strong>：它们是<strong>正交</strong>的。MCP 解决"Agent 怎么拿工具"，A2A 解决"Agent 怎么找 Agent"。一个系统里两者并存是常态。就像 HTTP 和 TCP 不是竞争关系——HTTP 跑在 TCP 上，A2A 和 MCP 在同一个架构里各司其职。2025 年 12 月 Linux Foundation 成立 Agentic AI Foundation (AAIF)，同时托管 MCP 和 A2A，官方定位就是互补。</p>
+            <h3>误区二："用了 A2A 就能实现真正的多 Agent 智能协作"</h3>
+            <p><strong>真相</strong>：A2A 是<strong>通信协议</strong>，不是<strong>协作智能</strong>。它让 Agent 能互相发消息，但不保证消息有意义、不保证协作高效、不保证结果正确。真正的多 Agent 协作需要上层的编排逻辑（Harness/Loop）、任务分解策略、冲突消解机制——A2A 只是最底层的"电话线"。研究显示，即使有了 A2A，多 Agent 系统的 token 重复率仍高达 53%-86%，说明协调效率问题远未解决。</p>
+            <h3>误区三："Agent Card 是静态配置，配一次就不用管"</h3>
+            <p><strong>真相</strong>：Agent Card 应该是<strong>动态</strong>的。远程 Agent 的能力、负载、版本都在变，Agent Card 需要实时反映这些变化。理想情况下，Agent Card 应该包含：</p>
+            <ul>
+                <li>当前负载（QPS/队列深度）</li>
+                <li>最近成功率/延迟百分位</li>
+                <li>版本号和变更日志</li>
+                <li>维护窗口和降级策略</li>
+            </ul>
+            <p>把它当成静态 JSON 文件放在 <code>/.well-known/</code> 下，是<strong>反模式</strong>。</p>
+            <h3>误区四："A2A 不暴露内部状态，所以很安全"</h3>
+            <p><strong>真相</strong>："不暴露内部状态"是指<strong>协议层</strong>不暴露 prompt、思考链、记忆——但<strong>应用层</strong>的安全完全是另一回事。A2A 的 Agent Card 是自声明的，没有验证；任务委托时的身份令牌可能过度授权；流式返回的内容可能包含敏感信息。A2A 的"安全"是设计原则，不是开箱即用的保证。2026 年初的研究发现，A2A 生态中缺乏可验证的委托链（verifiable delegation chain）和审计机制，这是正在补的缺口。</p>
+            <p>💡 <strong>A2A 协议给了 Agent 们一张"国际护照"，但护照不能防止坏人入境——海关和安检（治理层）才是安全的关键。</strong></p>
+            <hr>
+            <h2 id="jieyu">总结</h2>
+            <h3>给小白的话</h3>
+            <p>A2A 就是 Agent 之间的"通用语言"。以前每个公司的 Agent 都说自己的方言，互相听不懂。A2A 像英语一样，让不同国家、不同框架的 Agent 能互相发任务、报进度、交结果。你只需要记住：MCP 是 Agent 拿工具的手，A2A 是 Agent 互相握手的协议。</p>
+            <h3>给开发者的话</h3>
+            <p>A2A 正在从"实验协议"变成"生产基础设施"，但协议的成熟不等于工程的成熟。你需要关注三个硬问题：</p>
+            <ol>
+                <li><strong>Agent Card 的可信度</strong>：如何验证远程 Agent 的"简历"不是吹牛？</li>
+                <li><strong>权限的衰减传递</strong>：委托任务时，如何不让远程 Agent 获得你的全部权限？</li>
+                <li><strong>分布式状态一致性</strong>：Cancel、Retry、Timeout 在长任务场景下如何不翻车？</li>
+            </ol>
+            <p>这三个问题，A2A 协议本身不解决，需要你在 Harness 层和 Governance 层自己补。</p>
+            <blockquote><strong>A2A 让 Agent 从"独居动物"变成了"群居动物"——但群居的秩序，从来不是靠"能互相说话"就能自动建立的。</strong></blockquote>
+            <h3>参考资料（研究方向）</h3>
+            <ul>
+                <li>Google A2A Protocol Specification (Linux Foundation, 2025-2026)</li>
+                <li>Agentic AI Foundation (AAIF) governance structure, Linux Foundation, Dec 2025</li>
+                <li>"Why do multi-agent LLM systems fail?" (NeurIPS 2025 Datasets and Benchmarks Track, Spotlight)</li>
+                <li>IETF Internet-Drafts on Agent Identity: AIMS, WIMSE, Agentic JWT, SCIM for Agents (2026)</li>
+                <li>Google DeepMind: "Intelligent AI Delegation" (Delegation Capability Tokens based on Macaroons, 2026)</li>
+                <li>"Governance Gaps in Agent Interoperability Protocols" (analysis of MCP, A2A, ACP limitations, 2025-2026)</li>
+                <li>"Agent-to-Agent Finance: Blockchain Payments and Trust Infrastructure" (arXiv, 2026)</li>
+            </ul>
+
+            <nav class="article-nav">
+                <a href="multimodal-agent.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🖇️ Multimodal Agent</span>
+                    </span>
+                </a>
+                <a href="mcp-evolution.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🔌 MCP Evolution</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
