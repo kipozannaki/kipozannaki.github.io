@@ -1,17 +1,20 @@
 <!DOCTYPE html>
+<!-- 文章页：Loop Engineering 工业级落地（系列收官篇） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loop Engineering · kipozannaki</title>
     <meta name="description" content="Loop Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
     <script>
     (function() {
         try {
             var saved = localStorage.getItem('theme');
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
-        } catch (e) { }
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
     })();
     </script>
     <link rel="stylesheet" href="../style.css">
@@ -22,89 +25,379 @@
         <nav class="site-nav">
             <a href="application.html">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
         </nav>
     </header>
+
     <article class="article-page">
         <header class="article-header">
             <h1>🔁 Loop Engineering 工业级落地</h1>
             <p class="meta">从"单次任务优化"到"长期自主调度系统" · 双栖科普</p>
         </header>
         <div class="article-body">
+
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#zujian">五大组件</a> · <a href="#anli">真实案例</a> · <a href="#shizhan">实战避坑</a> · <a href="#jiecie">与 Harness/Workflow 的衔接</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
             <h2 id="intro">一、引言：从工具到员工的关键一跃</h2>
             <p><strong>工具</strong>需要人按开关。<strong>员工</strong>自己会看时间表、自己检查质量、干不好知道找谁报告。</p>
             <p>前面六篇讲的是"怎么让 AI 干好一次任务"——给它手脚（Agent）、给它专业知识（Skill）、给它安全带（Harness Engineering）、给它干净的工作台（Context Engineering）、给它清楚的说明书（Prompt Engineering）。这些都是<strong>单次任务内的优化</strong>，还是得有人来按"开始"按钮。</p>
             <p><strong>Loop Engineering 要做的完全不同</strong>：设计一个<strong>持续运行、按计划触发、自我验证、知道什么时候该停、什么时候该交给人的调度系统</strong>。</p>
+            <p>具体到工作场景：你不是"有问题时手动启动代码审查"，而是"设置一条规则：每 6 小时自动检查一次代码库，发现新提交就启动审查流程，审查完验证结果，通过则记录成功、失败则自动重试一定次数、真搞不定就创建 Issue 通知人工"——整个过程不需要人从中间插手，系统自己转起来，一直转到该停的时候。</p>
             <blockquote>💡 <strong>Loop Engineering 的终极问题不是"怎么让它跑"，而是"怎么让它知道什么时候该停"。</strong></blockquote>
+
+            <!-- ========== 二、坐标 ========== -->
             <h2 id="zuobiao">二、Loop Engineering 在工程体系里的坐标</h2>
+            <p>先用"什么时候需要 Loop"来理解它的位置：</p>
             <table>
-                <thead><tr><th></th><th>手动触发</th><th>自动化 Workflow</th><th>Loop 调度系统</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>手动触发</th>
+                        <th>自动化 Workflow</th>
+                        <th>Loop 调度系统</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>启动方式</td><td>人点按钮</td><td>外部事件触发</td><td>定时 + 事件 + 条件，自主判断何时启动</td></tr>
-                    <tr><td>一次运行后</td><td>人看结果、人决定下一步</td><td>返回结果给上游系统</td><td>自己验证、自己决策、自己重试或交人</td></tr>
-                    <tr><td>适用场景</td><td>一次性任务、探索</td><td>响应式处理</td><td>持续监控、周期性任务、长期自主运行</td></tr>
+                    <tr>
+                        <td>启动方式</td>
+                        <td>人点按钮</td>
+                        <td>外部事件触发（如 webhook）</td>
+                        <td>定时 + 事件 + 条件，自主判断何时启动</td>
+                    </tr>
+                    <tr>
+                        <td>一次运行后</td>
+                        <td>人看结果、人决定下一步</td>
+                        <td>返回结果给上游系统</td>
+                        <td>自己验证、自己决策、自己重试或交人</td>
+                    </tr>
+                    <tr>
+                        <td>适用场景</td>
+                        <td>一次性任务、探索</td>
+                        <td>响应式处理、单次事件链</td>
+                        <td>持续监控、周期性任务、长期自主运行</td>
+                    </tr>
                 </tbody>
             </table>
-            <h2 id="zujian">三、拆开一个 Loop：五大组件</h2>
-            <h3>3.1 触发器（Trigger）</h3>
-            <p><strong>定时触发（Cron）</strong>、<strong>事件触发（Webhook）</strong>、<strong>条件触发</strong>（基于上次运行结果）。兜底检查："上次运行是什么时候？超过预期间隔则告警。"</p>
-            <h3>3.2 执行器（Executor）</h3>
-            <p>负责启动 Workflow 实例：串行还是并行？资源隔离？超时控制？</p>
-            <h3>3.3 验证器（Validator）</h3>
-            <p><strong>验证必须独立于执行，不让 Workflow 自己判断自己。</strong>规则验证 / 测试验证 / 一致性验证 / 人工验证 / 模型验证。</p>
-            <h3>3.4 决策器（Decider）</h3>
+            <p>在本站六篇框架里的位置：</p>
+            <ul>
+                <li><strong>× Agent 到 Prompt Engineering</strong>　这五篇讲的都是"单个 Workflow 内部怎么优化"。Loop 不关心"这个 Workflow 能不能跑好"，只关心"这个 Workflow 跑完了怎么办、要不要再跑一次、什么时候能停"。</li>
+                <li><strong>× Harness Engineering</strong>　下一节会单独展开。简单说，Harness 管"一个 Agent 运行的环境边界"，Loop 管"多个 Agent 运行的调度和结果仲裁"——两者是垂直分层的。</li>
+            </ul>
+
+            <!-- ========== 三、拆解：Loop 的五大组件 ========== -->
+            <h2 id="zujian">三、拆开一个 Loop，里面装的是什么</h2>
+            <p>一个完整的 Loop 由五块不可分割的组件组成。少一块，整个系统就会在某个环节失控：</p>
+
+            <h3>3.1 触发器（Trigger）：什么时候启动？</h3>
+            <p><strong>定时触发（Cron）</strong>：如"每 6 小时检查一次代码库"，适合周期性任务。</p>
+            <p><strong>事件触发（Webhook）</strong>：如"GitHub 有新提交就启动审查"，适合响应式任务。</p>
+            <p><strong>条件触发</strong>：如"上次运行发现 3 个未修复问题，2 小时后自动复查"，这是 Loop 层独有的——基于上次运行的<strong>结果</strong>来决定何时再跑一次。</p>
+            <p><strong>关键决策</strong>：触发器本身可能失效（cron 没触发、webhook 丢失），所以 Loop 需要一个兜底检查："上次运行是什么时候？距离现在多久了？如果超过预期的最长间隔，说明触发器出问题了，需要主动告警。"</p>
+
+            <h3>3.2 执行器（Executor）：怎么跑？</h3>
+            <p>负责启动 Workflow 的实例。关键决策包括：</p>
+            <ul>
+                <li><strong>串行还是并行？</strong>同一个 Loop 的两个实例能否同时跑？（通常答案是"不能"，除非 Workflow 之间完全无状态共享）</li>
+                <li><strong>资源隔离</strong>：每个 Workflow 实例是否要独立的 Harness 环境、独立的工具连接？</li>
+                <li><strong>超时控制</strong>：单个 Workflow 实例最长能跑多久？超时了是强行杀掉，还是让它跑完再判断？</li>
+            </ul>
+
+            <h3>3.3 验证器（Validator）：结果行不行？</h3>
+            <p><strong>这是最容易被忽视、也最容易出错的环节</strong>。关键原则：<strong>验证必须独立于执行，不让 Workflow 自己判断自己</strong>（这跟 Harness Engineering 里"生成者-评估者分离"是同一个思路）。</p>
+            <p>常见的验证方式：</p>
+            <ul>
+                <li><strong>规则验证</strong>：输出是否符合预定义的 schema？（如代码审查输出是否包含"问题清单"和"修复建议"两个字段）</li>
+                <li><strong>测试验证</strong>：跑一套测试套件，是否通过？</li>
+                <li><strong>一致性验证</strong>：同样的输入，多次运行 Workflow 的输出是否一致？如果不一致说明系统有随机性或状态问题。</li>
+                <li><strong>人工验证</strong>：抽样检查，人工标注"通过/不通过"——这个费人力，但对关键任务最可靠。</li>
+                <li><strong>模型验证</strong>：用另一个模型评估输出质量（代价高，慎用）。</li>
+            </ul>
+
+            <h3>3.4 决策器（Decider）：下一步干啥？</h3>
+            <p>根据验证结果，决定 Loop 的下一步动作。关键：<strong>决策逻辑必须可配置、可观测——绝对不能写死在代码里</strong>。</p>
+            <p>标准的决策矩阵：</p>
             <table>
-                <thead><tr><th>验证结果</th><th>决策类型</th><th>动作</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>验证结果</th>
+                        <th>决策类型</th>
+                        <th>动作</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>通过</td><td>成功终止</td><td>记录成功，停</td></tr>
-                    <tr><td>不通过，可重试</td><td>重试</td><td>修改条件再启动</td></tr>
-                    <tr><td>不通过，不可重试</td><td>降级</td><td>缩小范围再试</td></tr>
-                    <tr><td>连续 N 次不通过</td><td>交人</td><td>创建 Issue 通知人工</td></tr>
+                    <tr>
+                        <td>通过</td>
+                        <td>成功终止</td>
+                        <td>记录成功，停。下次触发时跳过已处理的部分。</td>
+                    </tr>
+                    <tr>
+                        <td>不通过，可重试</td>
+                        <td>重试</td>
+                        <td>修改触发条件或补充信息，再启动一次 Workflow</td>
+                    </tr>
+                    <tr>
+                        <td>不通过，不可重试</td>
+                        <td>降级</td>
+                        <td>降低目标或缩小范围，再试一次</td>
+                    </tr>
+                    <tr>
+                        <td>连续 N 次不通过</td>
+                        <td>交人</td>
+                        <td>终止 Loop，创建 Issue 或通知人工介入</td>
+                    </tr>
                 </tbody>
             </table>
-            <h3>3.5 状态持久化（State）</h3>
-            <p>运行历史、重试计数、问题模式库、性能指标、处理进度。</p>
-            <h2 id="anli">四、真实案例：代码库的持续审查 Loop</h2>
+
+            <h3>3.5 状态持久化（State）：记忆什么？</h3>
+            <p>Loop 需要跨多次运行的记忆，包括：</p>
+            <ul>
+                <li><strong>运行历史</strong>：每次 Workflow 的输入、输出、验证结果、耗时、成本</li>
+                <li><strong>重试计数</strong>：当前已重试几次，上限是多少</li>
+                <li><strong>问题模式库</strong>：历次运行发现的共性问题，用于下次优化触发条件</li>
+                <li><strong>性能指标</strong>：平均运行时长、成功率、Token 消耗趋势</li>
+                <li><strong>处理进度</strong>：比如代码审查 Loop，各文件的审查状态是"已审""待审"还是"需重审"</li>
+            </ul>
+
+            <!-- ========== 四、真实案例 ========== -->
+            <h2 id="anli">四、真实案例：一个代码库的持续审查 Loop</h2>
+            <p>把五大组件组合在一起，看看一个真实的 Loop 系统怎么运转。这个案例改编自我的开源项目 <a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">RELOO</a>，但展示的是"如果 RELOO 被嵌入到一个 Loop 调度系统里"会长什么样。</p>
+
+            <h4>案例：GitLab CI 集成的代码审查自动化</h4>
+            <p><strong>业务需求</strong>：一个代码库，每当有新提交时，需要自动运行多轮代码审查。如果审查发现问题，自动尝试修复。修复后再次审查，确保质量达标。</p>
+            <p><strong>流程图</strong>：</p>
             <pre><code>[Loop Trigger]
   每 6 小时检查一次 GitLab
-  或 GitLab webhook 触发
+  或 GitLab webhook 触发（新 commit/PR）
            │
            ▼
-[Executor] 启动审查 Workflow 实例
+[Executor]
+  启动 "RELOO 审查 Workflow" 实例
+  隔离的 Harness 环境（独立沙箱）
+  超时上限：30 分钟
            │
            ▼
-[Validator] Schema 验证 + 一致性验证 + 测试验证
+[Workflow 内部] ← 这是 RELOO 的地盘
+  └─ 六轮审查（核心逻辑、状态管理、交互一致性……）
+  └─ 每轮有子级的验证和重试
+           │
+           ▼
+[Validator]
+  1. Schema 验证：审查输出包含"问题清单"吗？
+  2. 一致性验证：相同代码重跑一次，输出一致吗？
+  3. 测试验证：修复后的代码能跑测试吗？
            │
            ├─ 全通过 ──→ [Decider] 成功终止
-           └─ 失败 ──→ [Decider] 重试或交人</code></pre>
+           │              └─ 记录"第 5 次运行成功"
+           │              └─ 标记这些文件"已审查"
+           │              └─ 下次触发时跳过
+           │
+           └─ 失败 ──→ [Decider] 判断重试还是交人
+                      │
+                      ├─ 重试计数 &lt; 2 ──→ [Executor] 再跑一次
+                      │                    （这次只聚焦失败维度）
+                      │
+                      └─ 重试 ≥ 2 ──→ 创建 GitLab Issue
+                                      "自动审查失败，请人工审查"</code></pre>
+
+            <p><strong>Loop 层的状态记忆</strong>（持久化到 <code>loop_state.json</code>）：</p>
+            <pre><code>{
+  "loop_id": "code_review_loop",
+  "last_trigger_time": "2026-01-15T10:30:00Z",
+  "trigger_type": "webhook",
+  "execution_count": 87,
+  "current_retry_count": 1,
+  "max_retries": 2,
+
+  "files_status": {
+    "src/main.py": {"status": "reviewed", "last_review_time": "2026-01-15T09:45:00Z"},
+    "src/utils.py": {"status": "pending", "commits_since_review": 3}
+  },
+
+  "pattern_library": [
+    {"pattern": "边界值检查缺失", "occurrences": 5, "fix_template": "add_boundary_checks"},
+    {"pattern": "空状态未处理", "occurrences": 3, "fix_template": "handle_empty_state"}
+  ],
+
+  "metrics": {
+    "avg_run_time_seconds": 420,
+    "success_rate": 0.78,
+    "avg_token_per_run": 15000
+  }
+}
+</code></pre>
+
+            <p><strong>关键洞察</strong>：</p>
+            <ul>
+                <li>Loop 层不决定"代码审查怎么做"（那是 Workflow/Harness 的事），只决定"什么时候开始审查、审查完了谁来验、验完了怎么办"</li>
+                <li>RELOO 的"六轮审查"是 Workflow 内部的细节，Loop 只关心"输入"和"输出是否达标"</li>
+                <li>一旦任务规模从"一次性审查一个文件"变成"持续监控整个代码库"，Loop 层的价值才真正体现出来</li>
+            </ul>
+
+            <!-- ========== 五、实战避坑 ========== -->
             <h2 id="shizhan">五、实战避坑：两个"血泪翻车现场"</h2>
+
             <h3>坑一：没有终止条件，Loop 变成了"永动机"</h3>
-            <p>四种终止条件缺一不可：成功终止 / 失败终止 / 超时终止 / 资源终止。</p>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>某个 Loop"验证通过就继续跑，不通过就重试"，但没有明确的"最多重试几次"上限。结果一个 Workflow 实例卡在了某个边界情况（比如网络抖动导致一个外部 API 频繁返回错误），决策器一直选择"重试"，Loop 就这样转啊转，烧钱不停。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>没有硬性的终止条件。没有"连续 N 次失败就交人、没有重试次数上限、没有总运行时间上限"。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>在决策器里硬编码四种终止条件，缺一不可：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>终止类型</th>
+                        <th>条件</th>
+                        <th>示例</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>成功终止</td>
+                        <td>连续 N 次 Workflow 输出通过验证</td>
+                        <td>"连续 3 次代码审查未发现新问题"</td>
+                    </tr>
+                    <tr>
+                        <td>失败终止</td>
+                        <td>重试次数达到上限</td>
+                        <td>"已重试 3 次，仍不通过，交人工"</td>
+                    </tr>
+                    <tr>
+                        <td>超时终止</td>
+                        <td>总运行时间超过阈值</td>
+                        <td>"这个 Loop 已经跑了 24 小时，强制停"</td>
+                    </tr>
+                    <tr>
+                        <td>资源终止</td>
+                        <td>成本/Token 消耗超限</td>
+                        <td>"本月审查预算已用完，停"</td>
+                    </tr>
+                </tbody>
+            </table>
             <blockquote>💡 <strong>没有终止条件的 Loop 不是自动化，是自动化灾难。</strong></blockquote>
+
             <h3>坑二："Loop 级"失败被当成"Workflow 级"失败处理</h3>
-            <p>触发器失效、验证器有 bug、决策器死循环、状态损坏——这些是 Loop 级的问题，需要单独的"健康检查"逻辑。</p>
-            <h2 id="jiecie">六、Loop / Workflow / Harness 的层级关系</h2>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>触发器失效了（cron 没触发、webhook 丢失），但系统没有发现。几天之后，某人才意外发现代码库的新提交压根没被审查过。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>系统只在乎"单次 Workflow 有没有异常"，没有在乎"这个 Loop 本身有没有按时跑"。这是一个更高层级的失败检测。</p>
+            <p><strong>解决方案</strong>：</p>
+            <p>在 Loop 层单独加一套"健康检查"逻辑：</p>
+            <pre><code>def loop_health_check(loop_state):
+    """检测 Loop 层本身有没有出问题"""
+    last_run = loop_state['last_trigger_time']
+    expected_interval = loop_state['trigger_interval']  # 比如 6 小时
+
+    if (now - last_run) &gt; expected_interval * 1.5:
+        # 没有按时触发，可能是触发器出问题了
+        alert("Loop health check failed: No run in the past {interval}")
+        # 手动执行一次备用流程
+        emergency_execute_workflow(loop_state)</code></pre>
+            <p>类似的高层级失败还包括：</p>
+            <ul>
+                <li><strong>验证器失效</strong>：验证逻辑本身有 bug。解决方案：用对照组（两套不同的验证器，结果要一致）</li>
+                <li><strong>决策器死循环</strong>：决策逻辑进入"总是决定重试"的死循环。解决方案：任何情况都必须有"最后的杀招"——实在不行就交人</li>
+                <li><strong>状态损坏</strong>：持久化状态丢失或不一致。解决方案：定期快照 + 异常时的恢复机制</li>
+            </ul>
+            <blockquote>💡 <strong>Loop 级失败往往比 Workflow 级失败更隐蔽、危害更大，因为系统表面看起来还在"跑"，其实已经瞎跑了。</strong></blockquote>
+
+            <!-- ========== 六、与 Harness/Workflow 的衔接 ========== -->
+            <h2 id="jiecie">六、进阶：Loop / Workflow / Harness 的层级关系</h2>
+            <p>这三个概念经常被搞混，因为它们确实有重叠。但用一张表来看，各自职责很清楚：</p>
             <table>
-                <thead><tr><th></th><th>Harness</th><th>Workflow</th><th>Loop</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>Harness Engineering</th>
+                        <th>Workflow</th>
+                        <th>Loop Engineering</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>时间维度</td><td>单次 Agent 运行内</td><td>单次运行的多步骤编排</td><td>跨多次运行的调度和决策</td></tr>
-                    <tr><td>核心问题</td><td>Agent 怎么安全地自主行动？</td><td>多个步骤怎么连成一条链？</td><td>多次运行怎么协调、什么时候停？</td></tr>
-                    <tr><td>失败处理</td><td>单步骤出错怎么办</td><td>某个实例失败怎么办</td><td>多次都失败了怎么办</td></tr>
+                    <tr>
+                        <td>时间维度</td>
+                        <td>单次 Agent 运行内</td>
+                        <td>单次运行的多步骤编排</td>
+                        <td>跨多次运行的调度和决策</td>
+                    </tr>
+                    <tr>
+                        <td>核心问题</td>
+                        <td>Agent 怎么安全地自主行动？</td>
+                        <td>多个步骤怎么连成一条链？</td>
+                        <td>多次运行怎么协调、什么时候停？</td>
+                    </tr>
+                    <tr>
+                        <td>关键组件</td>
+                        <td>权限边界、验证回路、重试机制</td>
+                        <td>任务定义、步骤顺序、数据流</td>
+                        <td>触发器、验证器、决策器、状态管理</td>
+                    </tr>
+                    <tr>
+                        <td>失败处理</td>
+                        <td>单步骤出错怎么办</td>
+                        <td>某个 Workflow 实例失败怎么办</td>
+                        <td>多次都失败了怎么办、什么时候认输</td>
+                    </tr>
+                    <tr>
+                        <td>例子</td>
+                        <td>给 Agent 加计数器防死循环</td>
+                        <td>设计"查数据 → 处理 → 生成报告"的三步链</td>
+                        <td>每天自动跑这个 Workflow，失败自动重试，5 天还失败就告诉人</td>
+                    </tr>
                 </tbody>
             </table>
+
+            <p><strong>环境隔离与资源管理</strong>（这是 Loop 层和 Harness 的交界处）：</p>
+            <ul>
+                <li>Loop 启动每一个 Workflow 实例时，都需要给它分配一个独立的 Harness 环境（独立沙箱、独立工具连接）吗？
+                  <ul>
+                    <li><strong>不一定</strong>——如果 Workflow 之间完全无状态共享，可以复用同一个 Harness</li>
+                    <li><strong>但通常要隔离</strong>——防止一个 Workflow 实例的异常行为污染另一个</li>
+                  </ul>
+                </li>
+                <li>Loop 终止后，分配给它的 Harness 环境怎么清理？
+                  <ul>
+                    <li><strong>必须显式回收</strong>——否则资源泄漏，时间长了系统会窒息</li>
+                  </ul>
+                </li>
+            </ul>
+
+            <!-- ========== 七、结语 ========== -->
             <h2 id="jieyu">七、结语：八块拼图拼完</h2>
-            <p><strong>给小白的话</strong>：Workflow 让 AI 能连续干一串事情。Loop 让 AI 能一直干下去——不用你每次手动点"开始"。</p>
-            <p><strong>给开发者的话</strong>：Loop 层是 AI 系统从"工具"变成"员工"的关键一跃。最难的部分不是"怎么让它跑起来"，而是"怎么让它知道什么时候该停"。</p>
+            <p><strong>给小白的话</strong>：Workflow 让 AI 能连续干一串事情（第 1 步查数据、第 2 步分析、第 3 步写报告）。Loop 让 AI 能一直干下去——不用你每次手动点"开始"。它像一个勤劳的实习生：每天按时来上班、自己检查工作质量、干得好就继续、干不好就重做、实在搞不定就告诉你"老板，这个我真不会"。</p>
+            <p><strong>给开发者的话</strong>：Loop 层是 AI 系统从"工具"变成"员工"的关键一跃。工具需要人时刻在旁边按开关。员工自己会看时间表、自己报告进度、知道什么时候该停。但代价是，你设计 Loop 时最难的部分，不是"怎么让它跑起来"，而是"怎么让它知道什么时候该停、什么时候出错了要告诉人"——这是系统可靠性和成本的分水岭。</p>
+            <p><strong>系列总结</strong>：回顾这六篇（加上即将推出的底层基础专题），整套 AI 工程的坐标系其实很清晰：</p>
             <table>
-                <thead><tr><th>层级</th><th>涉及的概念</th><th>解决什么问题</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>层级</th>
+                        <th>涉及的概念</th>
+                        <th>解决什么问题</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>底层基础</td><td>Transformer / 预训练 / Tokenization / RLHF</td><td>模型本身怎么造出来的</td></tr>
-                    <tr><td>单次优化层</td><td>Prompt / Context / Harness / Agent / Skill</td><td>让一次任务做好</td></tr>
-                    <tr><td>持续运行层</td><td>Loop Engineering</td><td>让任务一直做下去、知道什么时候停</td></tr>
+                    <tr>
+                        <td>底层基础</td>
+                        <td>Transformer / 预训练 / Tokenization / RLHF</td>
+                        <td>模型本身怎么造出来的</td>
+                    </tr>
+                    <tr>
+                        <td>单次优化层</td>
+                        <td>Prompt / Context / Harness / Agent / Skill</td>
+                        <td>让一次任务做好</td>
+                    </tr>
+                    <tr>
+                        <td>持续运行层</td>
+                        <td>Loop Engineering</td>
+                        <td>让任务一直做下去、知道什么时候停</td>
+                    </tr>
                 </tbody>
             </table>
-            <blockquote>💡 <strong>没有 Loop，AI 系统始终是工具。有了 Loop，它才开始有"自主意识"。</strong></blockquote>
-            <p class="refs"><strong>参考资料</strong>：<a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">kipozannaki/RELOO</a></p>
+            <blockquote>💡 <strong>没有 Loop，AI 系统始终是工具。有了 Loop，它才开始有"自主意识"——知道自己该干什么、干得好不好、什么时候该向人类交接。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：<a href="https://github.com/kipozannaki/RELOO" target="_blank" rel="noopener">kipozannaki/RELOO</a> —— AI 驱动的多轮代码迭代自审框架；本篇以 RELOO 中的迭代优化逻辑为范本，展示如何在 Loop 层进行持续调度</p>
+
             <nav class="article-nav">
                 <a href="workflow-engineering.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -114,9 +407,12 @@
                     </span>
                 </a>
             </nav>
+
             <a href="application.html" class="back-link">← 返回 Application 专题</a>
         </div>
     </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
@@ -128,6 +424,7 @@
         });
     })();
     </script>
+
     <footer class="site-footer">
         <p>© 2026 · kipozannaki</p>
     </footer>
