@@ -58,7 +58,7 @@
             <h3>1.1 代码块流程图</h3>
             <pre><code>┌─────────────────────────────────────────────────────────────┐
 │                    用户请求层 (User Request)                  │
-│              &quot;分析这份量子计算论文的核心创新点&quot;                │
+│              "分析这份量子计算论文的核心创新点"                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -111,14 +111,7 @@
 └─────────────────────────────────────────────────────────────┘</code></pre>
             <h3>1.2 关系表：Long Thinking 与周边概念</h3>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>概念</th>
-                        <th>与 Long Thinking 的关系</th>
-                        <th>一句话区分</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>概念</th><th>与 Long Thinking 的关系</th><th>一句话区分</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td><strong>Test-Time Compute</strong></td>
@@ -234,7 +227,7 @@
                 <li><strong>DeepSeek-V4-Pro</strong>：dual think mode，单模型内切换，不需要调用不同 endpoint。</li>
             </ul>
             <p><strong>效果</strong>：减少部署复杂度（一个模型覆盖所有场景），避免"模式切换"的延迟和错误。</p>
-            <p>#### 实现三：RLVR 训练长思考能力</p>
+            <h4>实现三：RLVR 训练长思考能力</h4>
             <p><strong>直觉</strong>：像教小孩下棋。不是告诉他"每一步怎么走"（SFT），而是让他自己下，赢了给糖、输了给巴掌（RL），最终他自己悟出"需要多想几步"的策略。</p>
             <p><strong>具体</strong>：</p>
             <ul>
@@ -334,13 +327,7 @@
             <h2 id="engineering">为什么开发者要懂：知识网络咬合</h2>
             <h3>5.1 与已发布文章的关联</h3>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>已发布文章</th>
-                        <th>Long Thinking 如何与之咬合</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>已发布文章</th><th>Long Thinking 如何与之咬合</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td><strong>Test-Time Compute</strong></td>
@@ -428,7 +415,7 @@
             <ol>
                 <li><strong>成本架构设计</strong>：对大批量任务使用 MoE 本地部署（DeepSeek/Llama 4），利用 prompt caching（Claude cache read 10% 价格），实施模型级联（cheap model first，expensive model on low confidence）。</li>
             </ol>
-            <p>><strong>Long Thinking 不是让模型从"快思考"变成"慢思考"，而是让模型学会"该快时快、该慢时慢、该停时停"——但 2026 年的现实是，大多数模型还停在"要么不想、要么想太多"的两极，而开发者的工作就是让它们学会中间状态。</strong></p>
+            <blockquote><strong>Long Thinking 不是让模型从"快思考"变成"慢思考"，而是让模型学会"该快时快、该慢时慢、该停时停"——但 2026 年的现实是，大多数模型还停在"要么不想、要么想太多"的两极，而开发者的工作就是让它们学会中间状态。</strong></blockquote>
             <h3>参考资料（研究方向）</h3>
             <ul>
                 <li>"Don't Overthink it: Preferring Shorter Thinking Chains for Improved LLM Reasoning" (arXiv, 2025)</li>
@@ -440,16 +427,7 @@
                 <li>"Chain of draft: thinking faster by writing less" (arXiv, 2025)</li>
                 <li>Qwen3 Technical Report (arXiv, 2025) — native thinking-mode with adaptive budget</li>
                 <li>OLMo 3 Technical Report (arXiv, 2025) — Thinking SFT → DPO → RLVR pipeline</li>
-                <li>DAPO: An Open-Source LLM Reinforcement Learning System at Scale (arXiv, 2025)</li>
-                <li>VAPO: Value-model-based RL with length-adaptive GAE (arXiv, 2025)</li>
-                <li>Kimi k1.5: Long-context RL with policy optimization (2025)</li>
-                <li>rStar-Math: Small LMs bootstrap reasoning via MCTS rollouts (2025)</li>
-                <li>AI Crucible: Thinking Models of 2026 — Deep Reasoning Compared (2026)</li>
-                <li>TeamAI: Best AI Models for Complex Reasoning Compared (2026)</li>
-                <li>OpenReview: Qwen3 training details (2026) — four-stage post-training with thinking mode fusion</li>
             </ul>
-            <h3>下一篇预告</h3>
-            <p><strong>骗你的还没想好写什么（笑）</strong></p>
 
             <nav class="article-nav">
                 <a href="mcp-evolution.html" class="nav-card nav-prev">
@@ -461,8 +439,8 @@
                 </a>
                 <a href="frontier.html" class="nav-card nav-next">
                     <span class="nav-content">
-                        <span class="nav-label">下一站</span>
-                        <span class="nav-title">返回 Frontier 专题</span>
+                        <span class="nav-label">返回专题</span>
+                        <span class="nav-title">🌌 Frontier 全部文章</span>
                     </span>
                     <span class="nav-arrow">→</span>
                 </a>
