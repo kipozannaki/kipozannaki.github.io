@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：Test-Time Compute（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test-Time Compute · kipozannaki</title>
+    <meta name="description" content="为什么同一个模型多问几次投票选答案，正确率能明显提升？一篇讲清"花测试时算力"到底有哪些具体方法，以及为什么不是越多越好。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⏱️ Test-Time Compute</h1>
+            <p class="meta">为什么同一个模型多问几次投票选答案，正确率能明显提升？一篇讲清"花测试时算力"到底有哪些具体方法，以及为什么不是越多越好。</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能只靠训练时堆参数</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></blockquote>
+            <h2 id="intro">引言：模型能力，不只取决于训练那一刻</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么同一个模型，只问一次答案一般，问很多次再投票选一个，正确率能明显提升？</li>
+                <li>为什么"测试时计算"这个概念一出现，"参数规模"就不再是决定模型能力的唯一因素了？</li>
+                <li>为什么有研究发现，一个较小的模型配合更多测试时计算，有时候能追上甚至超过一个更大但只算一次的模型？</li>
+                <li>为什么给模型加了一个"验证器"去打分选最优答案，结果有时候反而不如它自己直接生成一次？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>Test-Time Compute（测试时计算）</strong>这个概念里——核心思路是：<strong>不改动模型的任何一个参数，只是在真正回答问题的那一刻多花一点算力，就能换来更好的答案质量</strong>。上一篇 Reasoning Model 讲的"让模型自己想更久"，其实只是这个更大概念下的一种具体实现方式。</p>
+            <blockquote>💡 <strong>训练是"把知识刻进脑子里"，测试时计算是"考试的时候多打几遍草稿、多检查几遍"——后者不需要重新学一遍，只是肯多花点时间和力气。</strong></blockquote>
+            <h2 id="zuobiao">Test-Time Compute 在这套体系里的坐标</h2>
+            <pre><code>Foundation：Inference（一次推理内部是怎么算的：Prefill + Decode）
+    ↓
+Frontier：Reasoning Model（花测试时算力的一种具体实现：让单次生成塞进更长的思考链条）
+    ↓
+Frontier：Test-Time Compute（更大的框架：除了想更久，还有哪些花算力的方法）  ← 本篇
+    ↓
+Frontier：Inference Scaling（下一篇：这些方法花下去，收益曲线长什么样）</code></pre>
+            <p><strong>先划一条容易混的边界</strong>：本篇讲"有哪些具体方法可以在推理阶段多花算力"（方法论），下一篇 Inference Scaling 讲"这些方法花下去之后，收益增长曲线是什么形状、边际收益怎么递减"（定量规律）——一个讲工具箱里有什么，一个讲每件工具用力气换回报的效率曲线，这里不重复下一篇的内容。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>相关概念</th>
+                        <th>跟 Test-Time Compute 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frontier · Reasoning Model</td>
+                        <td>让模型生成更长思考链条，是本篇讲的众多"花测试时算力"方法里的一种，内嵌在模型的默认生成行为里</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier · MCTS / Tree Search（后续）</td>
+                        <td>另一种花测试时算力的具体算法路线，用显式的搜索树结构探索多条候选路径，具体算法留给专门一篇细讲</td>
+                    </tr>
+                    <tr>
+                        <td>Foundation · Inference</td>
+                        <td>上一层讲清楚了"一次推理"内部怎么算，本篇讨论的是更高层的决策——要不要多算几次、算多久</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>Reasoning Model 是"花算力"的一种具体产品形态，Test-Time Compute 是这整个思路的名字——理解了这个更大的框架，才知道除了"让模型自己想更久"，工具箱里还有别的选择。</strong></blockquote>
+            <h2 id="why">为什么不能只靠训练时堆更大的模型？</h2>
+            <p>一个自然的问题：想要更强的能力，为什么不直接把预训练模型做得更大？</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>训练阶段堆参数/堆数据</td>
+                        <td>重新训练一个更大规模的模型</td>
+                        <td>边际成本极高（重新训练一次动辄千万美元级别），而且提升是"永久烙印"进模型参数的，没法针对某一次具体请求灵活调整</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>如果只是<strong>某一次</strong>请求特别复杂、特别值得多花点力气，有没有办法不动模型本身，只在这一刻多花点算力，就换来更好的答案？这正是 Test-Time Compute 要回答的问题——把"要不要多花力气"这个决策，从"训练前一次性定死"变成"每次请求可以按需调整"。</p>
+            <blockquote>💡 <strong>训练时堆参数是"把整个学校都建得更大"，测试时计算是"这场考试，允许你多打几次草稿"——后者灵活得多，也便宜得多。</strong></blockquote>
+            <h2 id="how">Test-Time Compute 到底有哪些具体方法？</h2>
+            <p>几种常见的实现方式：</p>
+            <p><strong>多数投票（Self-Consistency）</strong>：让模型对同一个问题独立生成多个答案（比如 10 次），最后选出现次数最多的那个作为最终答案。对于有明确对错标准的任务（比如数学题），"多数表决"往往比单次生成更准。</p>
+            <p><strong>验证器打分（Best-of-N + Verifier）</strong>：让模型生成 N 个候选答案，再用一个专门的"验证模型"对这些候选逐一打分，选出分数最高的一个——不是简单投票，而是引入额外的裁判机制，适合没那么容易"多数一致"的复杂任务。</p>
+            <p><strong>更长的推理链条</strong>：也就是上一篇 Reasoning Model 用到的机制——让模型在给出最终答案前，先生成更长的中间推理过程。算力花在"一次生成里塞进更多思考步骤"，而不是"生成多次取多数"。</p>
+            <p><strong>迭代式自我改进（Iterative Refinement）</strong>：模型先给出一个初稿答案，再针对自己的初稿做批评和修改，反复几轮，最终版本通常比第一版更好。</p>
+            <p>这些方法有一个共同点：<strong>都不需要重新训练模型</strong>，只是在推理阶段多花计算资源（多次生成、更长生成、额外的打分验证），就能换来质量提升——这跟"预训练阶段堆参数"是完全不同的两条成本曲线。</p>
+            <blockquote>💡 <strong>投票、打分、想更久、自我修改——这些方法的本质都是同一件事：把"一次就交卷"改成"允许多花点力气再交卷"，只是花力气的具体方式不一样。</strong></blockquote>
+            <h2 id="impact">Test-Time Compute 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+            <h3>为什么"多投票几次"在某些任务上完全不起作用？</h3>
+            <p><strong>翻车现场</strong>：对一个开放性、没有唯一正确答案的问题（比如"写一首诗"），尝试用多数投票的方式选出"最好"的答案，发现完全没有意义，选出来的反而是最平庸的那个版本。</p>
+            <p><strong>根因</strong>：多数投票依赖"正确答案只有一个，且模型大概率能生成对"这个前提。对于开放性、创造性任务，压根不存在"多数即正确"这个逻辑——投票机制反而会把最有特色但属于少数派的好答案淘汰掉，选出来的是风格上的最大公约数，也就是最平庸的那个。</p>
+            <h3>为什么"花测试时算力"不是无限划算的？</h3>
+            <p><strong>翻车现场</strong>：从生成 1 个候选答案增加到生成 10 个，正确率有明显提升；但从 10 个增加到 100 个，提升幅度却小得多，算力成本却是线性甚至更快增长的。</p>
+            <p><strong>根因</strong>：测试时计算带来的收益普遍呈现边际递减——不是无限投入就能无限提升，这也是为什么"该花多少测试时算力"本身是一个需要权衡成本和收益的决策，不是越多越好。这条边际递减曲线具体长什么样，留给下一篇 Inference Scaling 细讲。</p>
+            <h3>为什么用验证器打分选出的"最优答案"，有时候反而不如模型自己一次生成的？</h3>
+            <p><strong>翻车现场</strong>：用一个专门的验证模型对多个候选答案打分选优，结果选出来的答案质量，反而不如让模型直接生成一次的效果。</p>
+            <p><strong>根因</strong>：验证器本身也是一个训练出来的模型，存在自己的误判和偏差——比如可能对某种表达风格有偏好，而不是真正基于内容正确性打分。如果验证器本身质量不够好，"用验证器选优"这个环节反而可能引入新的系统性偏差，不是加了验证环节就一定更准。</p>
+            <blockquote>💡 <strong>测试时计算是一把双刃剑：用对了任务类型，多花的算力能实实在在换来正确率；用错了任务类型，多花的算力可能只是在稀释掉本来就正确的答案。</strong></blockquote>
+            <h2 id="engineering">为什么开发者一定要懂 Test-Time Compute？</h2>
+            <p><strong>呼应 Reasoning Model</strong>：上一篇讲的"生成更长思考链条"，本质上是本篇讲的众多"花测试时算力"方法里的一种——理解了这个更大的框架，才知道除了"让模型自己想更久"，还有多数投票、验证器打分等其他可选工具，可以根据任务类型灵活组合。</p>
+            <p><strong>成本决策</strong>：面对复杂任务，不一定非要选一个更大的模型——配合合适的测试时计算策略（比如多次采样加投票），中小模型有时候能达到接近大模型的效果，这是一个值得纳入成本优化考虑的选型思路。</p>
+            <p><strong>Topic③ 推理优化</strong>：测试时计算策略（多次生成、验证器打分）直接影响并发请求量和批处理调度，这类工程实现细节留给 Topic③ 细讲。</p>
+            <p><strong>往下一篇的伏笔</strong>：本篇讲清楚了"有哪些方法"，下一篇 Inference Scaling 要讲的，是把这些方法的收益曲线定量化——到底是什么样的数学规律，决定了"多花算力"带来的边际收益递减速度。</p>
+            <h2 id="wuqu">常见误区</h2>
+            <h3>误区一：只要给模型更多测试时算力，任何任务的效果都会变好</h3>
+            <p><strong>真相</strong>：对有明确对错标准的任务（数学、代码）效果明显；对开放性、创造性任务，多数投票这类方法反而可能选出更平庸的答案——不是所有任务都适用同一套测试时计算策略。</p>
+            <h3>误区二：测试时计算能无限制地替代模型参数规模</h3>
+            <p><strong>真相</strong>：收益存在明显的边际递减，不是无限堆算力就能让小模型无限逼近大模型的能力天花板，两者的关系更接近"部分替代、有限提升"，不是完全等价。</p>
+            <h3>误区三：加了验证器/打分环节，结果一定比不加更可靠</h3>
+            <p><strong>真相</strong>：验证器本身也是训练出来的模型，存在自己的偏差和误判，验证器质量不够好时，反而可能引入新的系统性偏差。</p>
+            <h3>误区四：测试时计算和模型训练是两件互不相关的事</h3>
+            <p><strong>真相</strong>：像 Reasoning Model 那样，很多测试时计算能力本身也需要专门训练才能发挥出来（模型要先学会怎么有效利用更长的思考链条），不是随便一个模型多花算力就自动会用。</p>
+            <blockquote>💡 <strong>选测试时计算策略，先看任务有没有客观对错标准——有，多花算力大概率划算；没有，多花算力可能只是在选一个更平庸的答案。</strong></blockquote>
+            <h2 id="jieyu">总结：不改模型，也能多考几分</h2>
+            <p><strong>给小白的话</strong>：下次看到某个 AI 产品说自己"会多想几遍再回答"，可以理解成——它不是模型本身变了，是在回答这一刻，多花了点计算资源去交叉验证或者反复琢磨，这笔"多想的成本"，通常也会体现在响应速度和价格上。</p>
+            <p><strong>给开发者的话</strong>：Test-Time Compute 提供了一整套不需要重新训练模型、只在推理阶段花算力换质量的方法——多数投票、验证器打分、更长推理链条、迭代自我改进。理解每种方法适合什么类型的任务，比盲目"多花算力"更重要，尤其是要清楚这条收益曲线存在边际递减，不是无限投入就能无限提升。</p>
+            <blockquote>💡 <strong>参数规模决定了模型的能力天花板，测试时计算决定了这一次回答，模型愿不愿意、能不能把这个天花板下的能力真正发挥出来——两者是完全不同的两个杠杆。</strong></blockquote>
+            <p><strong>参考资料</strong>：Snell et al. 关于测试时计算 Scaling 的相关研究；Wang et al., <em>Self-Consistency</em> 原始研究</p>
+
+            <nav class="article-nav">
+                <a href="reasoning-model.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🧠 Reasoning Model</span>
+                    </span>
+                </a>
+                <a href="inference-scaling.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">📈 Inference Scaling</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
