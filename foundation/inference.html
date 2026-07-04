@@ -1,17 +1,20 @@
 <!DOCTYPE html>
+<!-- 文章页：Inference — Foundation & Core Algorithms 专题第六篇 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inference · kipozannaki</title>
     <meta name="description" content="为什么第一个字慢吞吞、后面的字却蹦得很快？为什么长对话越聊越卡越贵？一篇讲清大模型推理到底在算什么。">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
     <script>
     (function() {
         try {
             var saved = localStorage.getItem('theme');
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
-        } catch (e) { }
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
     })();
     </script>
     <link rel="stylesheet" href="../style.css">
@@ -34,6 +37,7 @@
 
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能一次生成整句话</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
 
+            <!-- ========== 0、引言 ========== -->
             <h2 id="intro">零、引言：模型说话，其实是「边想边说」</h2>
             <p>先扔几个问题：</p>
             <ul>
@@ -45,6 +49,7 @@
             <p>这些现象的答案，都在 <strong>Inference（推理）</strong>这一步——也就是模型对齐训练完成之后，被真正拿去部署、每次你调用 API 时实际发生的事情。上一篇讲的 Alignment 让模型学会了「该怎么回应」，本篇要讲的，是它把答案一个字一个字「说出来」的这个过程，到底在算什么。</p>
             <blockquote>💡 <strong>训练阶段模型是在「学」，推理阶段模型是在「用」——你每天调用 API 感受到的延迟和成本，全部发生在推理这一步。</strong></blockquote>
 
+            <!-- ========== 1、坐标 ========== -->
             <h2 id="zuobiao">一、Inference 在 AI 世界里的坐标</h2>
             <p>紧接 Alignment 管线往下走：</p>
             <pre><code>Tokenizer → Embedding → Attention / Transformer → Pretraining → Alignment（对话模型训练完成）
@@ -54,7 +59,12 @@ Inference：Prefill（读懂输入）→ Decode（逐字生成）  ← 本篇
 LLM 输出</code></pre>
             <p>这一阶段的影响会渗透到整个工程体系里：</p>
             <table>
-                <thead><tr><th>工程概念</th><th>跟 Inference 的关系</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 Inference 的关系</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <tr><td>Context Engineering</td><td>长对话越聊越卡、越贵，根源就在本篇要讲的显存占用随上下文长度增长的机制</td></tr>
                     <tr><td>Topic③ 推理优化（KV Cache / PagedAttention / vLLM / SGLang / Speculative Decoding）</td><td>本篇讲清楚「为什么慢、为什么占显存」这些原理层面的问题；这些具体工程手段是怎么解决这些瓶颈的，留到专门的 Topic③ 细讲，这里不重复</td></tr>
@@ -63,18 +73,34 @@ LLM 输出</code></pre>
             </table>
             <blockquote>💡 <strong>Attention 那篇讲过计算量随上下文长度呈平方级增长——这不是一个抽象的数学结论，你每天感受到的「聊得越久越卡」，就是这条规律在真实世界里的样子。</strong></blockquote>
 
+            <!-- ========== 2、为什么不能一次生成整句话 ========== -->
             <h2 id="why">二、为什么不能一次性把整句话生成出来？</h2>
             <p>一个直觉的问题：模型训练时可以并行处理整个句子，为什么推理时不能一次性把答案整段吐出来？</p>
             <table>
-                <thead><tr><th>方案</th><th>怎么做</th><th>致命问题</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>一次性并行生成整段输出</td><td>所有位置的词同时预测出来</td><td>每个词在被预测的那一刻，还看不到后面即将出现的词是什么，很难保证整段话前后连贯、语法一致，实际效果明显不如逐步生成</td></tr>
-                    <tr><td>逐词生成（自回归，Autoregressive）</td><td>每次只生成一个新词，把它加进上下文，再生成下一个</td><td>生成一段长回答必须严格串行，没法把单条请求内部的生成过程并行加速</td></tr>
+                    <tr>
+                        <td>一次性并行生成整段输出</td>
+                        <td>所有位置的词同时预测出来</td>
+                        <td>每个词在被预测的那一刻，还看不到后面即将出现的词是什么，很难保证整段话前后连贯、语法一致，实际效果明显不如逐步生成</td>
+                    </tr>
+                    <tr>
+                        <td>逐词生成（自回归，Autoregressive）</td>
+                        <td>每次只生成一个新词，把它加进上下文，再生成下一个</td>
+                        <td>生成一段长回答必须严格串行，没法把单条请求内部的生成过程并行加速</td>
+                    </tr>
                 </tbody>
             </table>
             <p>模型最终采用的是自回归生成：<strong>每一步只能根据「已经生成出来的内容」去预测下一个词，没法跳过，也没法回头</strong>。这是保证输出连贯、逻辑一致的代价——训练阶段能并行处理整个序列，是因为训练时「正确答案」已经全部摆在那里；推理阶段要生成的内容还不存在，只能一步一步「边想边说」。</p>
             <blockquote>💡 <strong>训练是「照着答案抄一遍」，可以整页一起抄；推理是「现场即兴发言」，只能一句接一句往下说，说出口的话没法收回去重排。</strong></blockquote>
 
+            <!-- ========== 3、怎么工作的 ========== -->
             <h2 id="how">三、Inference 到底是怎么工作的？</h2>
             <p>推理过程分两个阶段，性质完全不同：</p>
             <p><strong>Prefill（预填充）</strong>：处理你输入的全部内容——问题、历史对话、检索回来的文档，一次性并行计算它们之间的 Attention。因为输入内容是已知、完整的，这一步可以并行处理，但如果输入本身很长（比如塞了一大段检索文档），这一步照样要花不少时间——这正是「第一个字要等一下」的原因：<strong>首字延迟（TTFT，Time to First Token）主要取决于 Prefill 阶段要处理多长的输入</strong>。</p>
@@ -82,6 +108,7 @@ LLM 输出</code></pre>
             <p>这也是为什么显存常常比算力更早成为瓶颈：模型参数本身要占显存，KV Cache 也要占显存，而且 KV Cache 的占用量是随「对话长度 × 并发请求数」一起涨的——一台服务器能同时撑住多少用户，很多时候不是被算力卡住，是被显存卡住的。KV Cache 具体怎么被工程化管理（比如 PagedAttention 这类技术），留给 Topic③ 专题细讲。</p>
             <blockquote>💡 <strong>Prefill 是「读完你说的话」，Decode 是「一个字一个字回答你」——前者可以并行冲刺，后者只能老老实实排队，这是两种完全不同的性能特征。</strong></blockquote>
 
+            <!-- ========== 4、怎么影响能力 ========== -->
             <h2 id="impact">四、Inference 会如何影响模型能力？</h2>
             <p>只讲真实案例。</p>
 
@@ -98,12 +125,14 @@ LLM 输出</code></pre>
             <p><strong>根因</strong>：推理效率高度依赖工程实现——批处理调度做得好不好（比如能不能把多个用户的请求高效拼在一起处理）、显存管理方案先不先进、有没有用推测解码等加速手段，这些都是纯工程优化空间。同样的模型权重，跑在不同的推理引擎上，性能可以差出几倍——这部分具体技术，会放到 Topic③ 专题细讲。</p>
             <blockquote>💡 <strong>模型权重决定了「能不能答对」，推理引擎决定了「答得快不快、贵不贵」——两者是完全不同的两件事，很多时候慢不是模型的锅。</strong></blockquote>
 
+            <!-- ========== 5、为什么开发者要懂 ========== -->
             <h2 id="engineering">五、为什么开发者一定要懂 Inference？</h2>
             <p><strong>Context Engineering</strong>：长对话越聊越卡、越贵的根源，就在本篇讲的 KV Cache 随长度增长的机制——理解了这一点，「精简上下文」「定期开新对话」这些应用层原则，才不只是经验之谈，而是有物理约束支撑的判断。</p>
             <p><strong>Topic③ 推理优化</strong>：本篇讲清楚了「为什么慢、为什么占显存」这些原理性问题，vLLM、SGLang、PagedAttention、Speculative Decoding 这些具体工程手段，都是在针对这些瓶颈做优化——理解了原理，才能真正看懂这些工具具体在解决什么问题，避免只会照抄配置参数。</p>
             <p><strong>Harness Engineering</strong>：设计 Agent Loop 的超时和重试策略时，首字延迟和逐字生成速度是两个独立的性能指标，用同一个笼统的超时值去覆盖两种完全不同的等待场景，很容易踩坑。</p>
             <p><strong>往下一篇的伏笔</strong>：推理这一层讲的是「跑一个标准模型该怎么算」，但不是所有模型的参数都会被同时用上——下一篇 MoE（混合专家模型）要讲的，正是「参数量」这个数字为什么开始变得没那么诚实。</p>
 
+            <!-- ========== 6、常见误区 ========== -->
             <h2 id="wuqu">六、常见误区</h2>
 
             <h3>误区一：模型推理慢，主要是因为算力不够</h3>
@@ -119,6 +148,7 @@ LLM 输出</code></pre>
             <p><strong>真相</strong>：这是来自 Prefill 和 Decode 两个不同瓶颈的独立指标，优化其中一个不代表另一个也会变好，生产系统需要分别监控、分别优化。</p>
             <blockquote>💡 <strong>理解推理，本质是理解你每天付的 API 账单和等待的那几秒钟，到底是在为哪一步买单——是在「读你说的话」，还是在「一个字一个字回答你」。</strong></blockquote>
 
+            <!-- ========== 7、总结 ========== -->
             <h2 id="jieyu">七、总结：说话是即兴的，没法回头重排</h2>
             <p><strong>给小白的话</strong>：下次觉得模型「怎么突然卡了一下才开始说话」，可以想想——它不是在犹豫，是在认真读完你说的所有话（包括历史对话），才开口的。</p>
             <p><strong>给开发者的话</strong>：Inference 是训练成果第一次真正被「消费」的地方——Prefill 和 Decode 两个阶段性质完全不同、KV Cache 用显存换速度、显存常常比算力更早成为瓶颈，这三件事打通了，才能看懂为什么长对话会变贵变慢，也才能真正理解 Topic③ 那些推理优化工程手段究竟在解决什么问题，而不只是照着文档调参数。</p>
@@ -126,6 +156,7 @@ LLM 输出</code></pre>
 
             <p class="refs"><strong>参考资料</strong>：Kwon et al. 关于 PagedAttention 与 vLLM 的相关研究；自回归语言模型（Autoregressive Language Model）生成机制的相关经典文献</p>
 
+            <!-- 跨文章导航：Foundation 专题第六篇，上一篇 Alignment，下一篇 MoE -->
             <nav class="article-nav">
                 <a href="alignment.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
@@ -147,6 +178,7 @@ LLM 输出</code></pre>
         </div>
     </article>
 
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
