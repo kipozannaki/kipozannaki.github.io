@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<!-- 文章页：Agent 工业级落地（重写版，5 大部分长文 + 坐标关系新增段） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 工业级落地 · kipozannaki</title>
+    <meta name="description" content="AI Agent 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧠 AI Agent 工业级落地</h1>
+            <p class="meta">从"调包侠"到"系统架构师" · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#yinyan">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#xuanxing">选型抉择</a> · <a href="#shizhan">实战避坑</a> · <a href="#jinjie">进阶与度量</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
+            <h2 id="yinyan">一、引言：别再谈大模型了，现在是 Agent 的时代</h2>
+            <p>如果你跟朋友说"我搞 AI 的"，对方大概率会问："大模型是啥呀？"——其实你可以这样回答：<strong>大模型就是三国里的诸葛亮</strong>。博古通今、运筹帷幄、张口就是锦囊妙计。但诸葛亮有个致命问题：<strong>他没有手脚</strong>。你让他去订个外卖、调个数据库、写个 Python 脚本，他只能给你一堆"建议"和"思路"。</p>
+            <p><strong>AI Agent 是什么？</strong>是给诸葛亮装上手脚、配上工具箱的"特种兵"。你只管下达目标："把这周的销售数据整理成 PPT 发给老板"，他立刻开始规划：先查数据库、再算数据、再生成 PPT、再调邮件接口发送——<strong>全程不需要你插手</strong>。</p>
+            <p>从工程视角看，Agent 的硬核定义是：<strong>Agent = LLM（大脑）+ Memory（记性）+ Tools（工具箱）+ Planning（规划能力）</strong>。它不是更长的 Prompt，而是一个<strong>以大模型为核心决策引擎的分布式软件系统</strong>。</p>
+            <blockquote>💡 真正的 Agent 开发，不是让 LLM 写更多话，而是让 LLM 当调度员。</blockquote>
+
+            <!-- ========== 二、坐标：Agent 在工程体系里的位置（新增） ========== -->
+            <h2 id="zuobiao">二、Agent 在工程体系里的坐标</h2>
+            <p>先把"自主程度"这把尺子亮出来——很多人分不清 Agent 和 Chatbot、Workflow 到底差在哪：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>普通 LLM 问答</th>
+                        <th>Chatbot</th>
+                        <th>Workflow 自动化</th>
+                        <th>Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>有没有记忆</td>
+                        <td>无</td>
+                        <td>有</td>
+                        <td>通常无</td>
+                        <td>有</td>
+                    </tr>
+                    <tr>
+                        <td>会不会用工具</td>
+                        <td>不会</td>
+                        <td>很少</td>
+                        <td>靠人预先编排</td>
+                        <td>自己决定调不调、调哪个</td>
+                    </tr>
+                    <tr>
+                        <td>步骤谁定的</td>
+                        <td>没有步骤</td>
+                        <td>没有步骤</td>
+                        <td>人写死的固定流程</td>
+                        <td>模型自己规划</td>
+                    </tr>
+                    <tr>
+                        <td>出错谁兜底</td>
+                        <td>用户自己</td>
+                        <td>用户自己</td>
+                        <td>提前写好的异常分支</td>
+                        <td>需要 Harness 层硬性兜底</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>这把尺子理清楚之后，再看 Agent 和本站另外五个概念是什么关系——它们不是孤立的科普词条，而是同一套工程体系里互相咬合的齿轮：</p>
+            <ul>
+                <li><strong>× Skill</strong>　本文第三节那份 JSON Schema，就是给 Agent 装的"手"——决定它能做什么。如果这只手要变得更专业、带上一整套工作流和参考资料，那就是 skill.html 讲的 SKILL.md：把"能调用什么工具"升级成"这类任务该按什么流程做"。一个管"有没有这双手"，一个管"这双手熟不熟练"。</li>
+                <li><strong>× Context Engineering</strong>　第四节"坑二"里的 Payload 裁剪、滑窗摘要，说白了就是 Context Engineering 在 Agent 场景里的具体打法——"上下文是工作台不是仓库"这句话本身就是它的核心信条。</li>
+                <li><strong>× Prompt Engineering</strong>　Schema 里 description 怎么写、System Prompt 怎么给 Agent 划定角色边界，全是 Prompt Engineering 的手艺活。Agent 的智商上限由模型决定，下限往往是 Prompt 写得糙不糙。</li>
+                <li><strong>× Harness Engineering</strong>　"硬编码计数器 + 超时切断"、"工具返回阻断信号"，这些机制就是 Harness 层在给 Agent 的自由裁量权画红线——Agent 越自主，Harness 就该收得越紧，不然它真敢把你家拆了。</li>
+                <li><strong>× Loop Engineering</strong>　第五节的消融实验就是最直接的例子——Agent 效果好不好不是拍脑袋定的，是靠"改一个变量、跑一轮、对比数据"的迭代闭环，这个闭环就是 Loop Engineering。</li>
+            </ul>
+            <blockquote>💡 <strong>Agent 是执行的躯壳，Skill 是装进去的专业知识，Context / Prompt / Harness / Loop Engineering 是让这具躯壳不失控的四道工序。</strong></blockquote>
+
+            <!-- ========== 三、选型 ========== -->
+            <h2 id="xuanxing">三、选型抉择：搭积木的"全家桶"，还是自己手撕底层？</h2>
+            <p>想搭一个 Agent 系统，你有两个选择：</p>
+            <p><strong>A 套餐：精装拎包入住的样板房</strong>——LangChain、CrewAI、AutoGen 这些重型框架。里面啥都有：Agent 基类、Tool 抽象、Memory 后端、几十种 Chain 模板。几天就能上线一个 Demo。但问题是，你以后想改个水管（Debug 一下调用链）？对不起，水管藏在墙里，trace 进去发现 5 层包装、3 个抽象基类、2 个 Mixin。<strong>改个字段名要翻三个文件</strong>。</p>
+            <p><strong>B 套餐：自己买砖盖楼</strong>——直接调各家 LLM 厂的原生 API（OpenAI Function Calling、Anthropic Tool Use），再自己写一个轻量的 Workflow 引擎控制循环。<strong>前期累，但每个螺丝钉都是你的</strong>，出了 Bug 一眼能看见。</p>
+            <p><strong>生产环境的真相</strong>：重型框架在"黑盒窒息感"和"API 频繁重构"两个维度都是减分项。今天的 v0.1 写法，半年后框架升级到 v0.3 全部 deprecated。<strong>工业级推荐架构是：原生 Function Calling / Skill 机制 + 自研轻量级 Workflow</strong>。</p>
+            <p>下面是一个干净、标准的 Tool/Skill JSON Schema 声明示例：</p>
+            <pre><code>{
+  "name": "query_sales_data",
+  "description": "查询指定时间范围内的销售数据。返回结构化的 JSON 数据，不要返回自然语言。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "start_date": {
+        "type": "string",
+        "format": "date",
+        "description": "开始日期，格式 YYYY-MM-DD"
+      },
+      "end_date": {
+        "type": "string",
+        "format": "date",
+        "description": "结束日期，格式 YYYY-MM-DD"
+      },
+      "region": {
+        "type": "string",
+        "enum": ["north", "south", "east", "west"],
+        "description": "销售区域"
+      }
+    },
+    "required": ["start_date", "end_date"]
+  }
+}</code></pre>
+            <p>写好 Schema 之后，<strong>大模型的工作其实只剩两件事</strong>：</p>
+            <ol>
+                <li><strong>决策分发（路由）</strong>：根据当前任务，决定要不要调用工具、调用哪个</li>
+                <li><strong>参数解析</strong>：把用户的自然语言需求，转换成符合 Schema 的 JSON 参数</li>
+            </ol>
+            <p>剩下的活儿——查数据库、调 API、生成文件——<strong>全交给传统软件代码</strong>。别让 LLM 去执行 SQL、别让 LLM 去算 1+1，这些是 CPU 的活儿。</p>
+            <blockquote>💡 大模型不执行代码，它只做两件事——<strong>决策分发（路由）</strong>与<strong>参数解析</strong>。剩下的活儿，全交给传统软件。</blockquote>
+
+            <!-- ========== 四、实战避坑 ========== -->
+            <h2 id="shizhan">四、实战避坑：单 Agent 结合工具的两个"血泪翻车现场"</h2>
+
+            <h3>坑一：死循环与"Token 碎纸机"</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>某天深夜 2 点，监控告警：某个 Agent 任务在 5 分钟内烧了 200 块。查日志发现，Agent 调用 <code>query_database</code> 工具，工具报错"表不存在"。LLM 觉得"那我换个字段名试试"——又错；LLM 又换——还错；又换——<strong>死循环</strong>。几百次重试，每次重试还要重新读历史上下文，<strong>Token 飞涨</strong>。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>LLM 遇到错误会"自作聪明"地尝试修复。但工具错误往往是<strong>数据问题</strong>（表真的不存在了），不是参数问题。让 LLM 自由发挥修复 = <strong>给哈士奇一把钥匙，他能把你家拆了</strong>。</p>
+            <p><strong>解决方案 1：硬编码计数器 + 超时切断</strong></p>
+            <pre><code>MAX_ITERATIONS = 10
+TIMEOUT_SECONDS = 60
+
+for i in range(MAX_ITERATIONS):
+    if time.elapsed() &gt; TIMEOUT_SECONDS:
+        break
+    thought = llm.think(context)
+    action  = llm.select_tool(thought)
+    result  = execute(action)
+    context = context + result</code></pre>
+            <p><strong>不管 LLM 想干啥，第 10 次循环到了就强制掐断</strong>。这是工程上的最后一道防线——别相信模型会自己停下来。</p>
+            <p><strong>解决方案 2：工具端"指令化改造"</strong></p>
+            <p>工具失败时，<strong>不要返回模糊的 Error</strong>，而要返回明确的"阻断信号"：</p>
+            <pre><code>{
+  "status": "BLOCKED",
+  "error_code": "TABLE_NOT_FOUND",
+  "retry_allowed": false,
+  "user_message": "表 sales_2024 不存在，请联系 DBA"
+}</code></pre>
+            <p>让 LLM 一眼看出"这事我搞不定，别重试"。</p>
+            <blockquote>💡 工具报错要像"红绿灯"——<strong>红就停，绿才走，黄灯让 LLM 自己决定</strong>。</blockquote>
+
+            <h3>坑二：上下文膨胀与"滚雪球式 Token 暴涨"</h3>
+            <p><strong>翻车现场还原</strong>：</p>
+            <p>Agent 调了 5 次工具，每次工具返回几 KB 的长文本（数据库查询结果、网页 HTML、API 响应）。这些文本全塞进 LLM 上下文，<strong>单次请求的 Token 量和延迟呈指数级暴涨</strong>。原本 2 秒的响应变成 30 秒，原本 1 毛钱的请求变成 1 块。</p>
+            <p><strong>根因剖析</strong>：</p>
+            <p>LLM 是"金鱼脑"——上下文越长，越容易分心抓不住重点；更要命的是，每次循环都要把<strong>全部历史</strong>重新塞给 LLM 计费一次。<strong>Token 不是仓库，是工作台</strong>。</p>
+            <p><strong>解决方案 1：严格的 Payload 裁剪</strong></p>
+            <p>工具返回 10 KB？<strong>只给 LLM 最核心的字段</strong>：</p>
+            <pre><code>// 工具返回的完整数据（10 KB）
+{
+  "rows": [
+    {"id": 1, "name": "...", "value": ..., "metadata": {...}},
+    ... 100 条
+  ],
+  "total": 100
+}
+
+// 喂给 LLM 的精简版（200 bytes）
+{
+  "summary": "100 条记录，总销售额 50 万，最高 8 万"
+}</code></pre>
+            <p><strong>全文检索交给传统数据库，别让 LLM 当 Oracle 用</strong>。</p>
+            <p><strong>解决方案 2：动态摘要 + 滑窗机制（Summary Memory）</strong></p>
+            <p>保留最近 3 轮完整对话 + 历史对话的摘要：</p>
+            <pre><code>class ContextWindow:
+    """上下文窗口管理：滑窗 + 摘要压缩"""
+
+    def __init__(self, full_window=3, summary_window=10):
+        # full_window 保留原文的轮数
+        self.full_window = full_window
+        # 再之前 summary_window 轮压缩为摘要
+        self.summary_window = summary_window
+        self.history = []
+        self.summary = ""
+
+    def add(self, role, content):
+        self.history.append({"role": role, "content": content})
+        # 超过窗口大小时触发摘要压缩
+        if len(self.history) &gt; self.full_window + self.summary_window:
+            old = self.history[:self.summary_window]
+            self.summary = llm.summarize(self.summary + old)
+            self.history = self.history[self.summary_window:]</code></pre>
+            <blockquote>💡 <strong>上下文不是仓库，是工作台</strong>——只放当前需要的工具，别把整个五金店搬进来。</blockquote>
+
+            <!-- ========== 五、进阶与度量 ========== -->
+            <h2 id="jinjie">五、进阶与度量：如何让 Agent 别跑偏？</h2>
+
+            <h3>提示词与反思的度</h3>
+            <p>很多教程教你让 Agent"自我反思"——错了就反思、反思完再试、再错再反思。听起来很美，<strong>实际上反思是个奢侈品</strong>：</p>
+            <ul>
+                <li>每次反思 = 一次 LLM 调用 = <strong>时间和钱</strong></li>
+                <li>大多数错误<strong>传统代码就能验</strong>（参数校验、Schema 检查、重试次数限制）</li>
+                <li>让 LLM 去"反思"一个明显是参数错误的场景 = <strong>用跑车送外卖</strong></li>
+            </ul>
+            <p>什么时候才该反思？<strong>当错误根源是"理解"而非"逻辑"</strong>——比如 LLM 误解了用户意图、对长文档理解有偏差。这种反思才值得花 Token。</p>
+            <blockquote>💡 <strong>能用传统代码逻辑做校验的，绝对不要交给大模型去盲目"反思"（Reflection），否则延迟和成本会直接爆炸。</strong></blockquote>
+
+            <h3>量化思维：消融实验（Ablation Study）</h3>
+            <p>Agent 系统复杂后，每次改动 Prompt、增减工具、调整摘要策略，效果如何？<strong>拍脑袋说不算</strong>。</p>
+            <p><strong>消融实验</strong>就是 AI 工程的"控制变量法"——一次只改一个变量，对比前后差异：</p>
+            <pre><code>实验编号   Prompt 策略    工具数  摘要窗口  成功率   平均 Token
+─────────  ──────────    ─────  ────────  ──────   ─────────
+baseline   v1            5      3 轮      72%      8K
++反思      v1 + 反思     5      3 轮      75%      15K
+-反思      v1 - 反思     5      3 轮      73%      7K
+精简工具   v1 - 反思     4      3 轮      74%      6K  ✓</code></pre>
+            <p>从表格能看出：加了反思成功率提升 3 个点，但 Token 几乎翻倍——<strong>性价很低</strong>。精简掉一个不常用的工具，成功率几乎不变但 Token 下降 14%——<strong>这是优选</strong>。</p>
+            <blockquote>💡 <strong>Agent 工程不是"我觉得"，是"数据说"</strong>。没有消融实验，不要轻易上线。</blockquote>
+
+            <!-- ========== 六、结语 ========== -->
+            <h2 id="jieyu">六、结语：拿到 AI 时代真正的"船票"</h2>
+            <p><strong>给小白的话</strong>：不用被那些术语吓到——找个低代码平台（比如 Dify、Coze、扣子），<strong>亲手搭一个能用的 Agent</strong>，比读 10 篇科普文都管用。技术从来不是看会的，是干会的。</p>
+            <p><strong>给开发者的话</strong>：别再满足于"我会调 LangChain"——<strong>亲手撕开底层</strong>，写一个基于 Schema 的原生 Skill，写一个轻量的 Workflow 控制循环，写一组消融实验数据对比效果。<strong>从"调包侠"走向"系统架构师"，这才是 Agent 时代真正的护城河</strong>。</p>
+            <blockquote>💡 <strong>不要做 AI 的搬运工，要做 AI 的建筑师。</strong></blockquote>
+
+            <!-- 跨文章导航：agent 是首篇，无上一站，仅下一站 Skill -->
+            <nav class="article-nav">
+                <a href="skill.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🛠️ Skill</span>
+                    </span>
+                </a>
+                <a href="harness-engineering.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🔧 Harness Engineering</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
