@@ -1,17 +1,20 @@
 <!DOCTYPE html>
+<!-- 文章页：Attention / Transformer — Foundation & Core Algorithms 专题第三篇 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attention / Transformer · kipozannaki</title>
-    <meta name="description" content="为什么一篇论文敢把标题写成「你只需要注意力」？一篇讲清 Attention 和 Transformer 到底在算什么。">
+    <meta name="description" content="为什么一篇论文敢把标题写成「你只需要注意力」？一篇讲清 Attention 和 Transformer 到底在算什么，以及为什么上下文越长，模型越容易「中间遗忘」。">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
     <script>
     (function() {
         try {
             var saved = localStorage.getItem('theme');
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
-        } catch (e) { }
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
     })();
     </script>
     <link rel="stylesheet" href="../style.css">
@@ -22,65 +25,184 @@
         <nav class="site-nav">
             <a href="../application/application.html">Application</a>
             <a href="foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
         </nav>
     </header>
+
     <article class="article-page">
         <header class="article-header">
             <h1>🧠 Attention：一篇论文凭什么把标题写成「你只需要注意力」？</h1>
             <p class="meta">为什么上下文越长推理越贵、为什么模型会「中间遗忘」？一篇讲清 Transformer 的发动机 · 双栖科普</p>
         </header>
         <div class="article-body">
+
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能直接用 RNN</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <!-- ========== 0、引言 ========== -->
             <h2 id="intro">零、引言：一篇论文，把整个行业的路线图给改了</h2>
-            <p>2017 年，Google 一篇论文的标题只有五个词：<strong>Attention Is All You Need</strong>——「你只需要注意力」。八年后回头看，这篇论文里提出的 Transformer 架构，撑起了从 GPT 到几乎所有现代大模型的底座。</p>
-            <p>先扔几个问题：为什么上下文一变长，推理速度和成本会明显往上跳？为什么关键信息塞进 Prompt 中间位置，模型经常「看不见」？为什么模型训练时见过的最长上下文是 4K，你硬塞 32K 进去，它开始「没那么聪明」了？</p>
-            <blockquote>💡 <strong>Embedding 让每个词有了一个初始位置。Attention 要做的，是让这个位置随着上下文实时「挪动」。</strong></blockquote>
+            <p>2017 年，Google 一篇论文的标题只有五个词：<strong>Attention Is All You Need</strong>——「你只需要注意力」。在那之前，处理文字序列的主流方案是 RNN、LSTM，一步一步往前挪；这篇论文的意思是：那些复杂的循环结构统统不需要，只靠注意力机制就够了。</p>
+            <p>八年后回头看，这篇论文里提出的 Transformer 架构，撑起了从 GPT 到几乎所有现代大模型的底座。但它到底解决了什么问题，为什么快、为什么会在长文本里「中间遗忘」，很多天天调用大模型 API 的人未必说得清楚。</p>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么上下文一变长，推理速度和成本会明显往上跳，不是线性增长？</li>
+                <li>为什么你把关键信息塞进一段很长的 Prompt 中间位置，模型经常「看不见」，放在开头或结尾反而更容易被抓住？</li>
+                <li>为什么模型明明训练时见过的最长上下文是 4K，你硬塞 32K 进去，它不是拒绝，而是开始「没那么聪明」了？</li>
+                <li>为什么「多头注意力」要设计成好几个头一起算，而不是一个头算到底？</li>
+            </ul>
+            <p>这些问题的答案，都在 Attention 这一层。</p>
+            <blockquote>💡 <strong>Embedding 让每个词有了一个初始位置。Attention 要做的，是让这个位置随着上下文实时「挪动」——同一个「苹果」，在「吃苹果」和「苹果公司」里，经过 Attention 之后应该落在完全不同的地方。</strong></blockquote>
+
+            <!-- ========== 1、坐标 ========== -->
             <h2 id="zuobiao">一、Attention / Transformer 在 AI 世界里的坐标</h2>
-            <pre><code>Tokenizer → Embedding → Attention / Transformer（在向量之间动态传递信息）← 本篇 → Pretraining → Inference → LLM 输出</code></pre>
+            <p>紧接 Embedding 管线往下走：</p>
+            <pre><code>Human Language
+    ↓
+Tokenizer（切成 Token）
+    ↓
+Token ID
+    ↓
+Embedding（编号变成有几何关系的向量）
+    ↓
+Attention / Transformer（在向量之间动态传递信息）  ← 本篇
+    ↓
+Pretraining（用海量数据把这套结构训练出知识）
+    ↓
+Inference（逐 Token 预测）
+    ↓
+LLM 输出</code></pre>
+            <p>Embedding 给出的是一个「静态起点」——每个词一个固定向量。但同一个词在不同句子里意思会变，模型必须能「看着上下文调整理解」，这件事就是 Attention 在做。Transformer 则是围绕 Attention 搭建起来的完整架构（Attention 层＋前馈网络＋残差连接等），是当前几乎所有主流大模型共用的骨架。</p>
+            <p>这一层的影响面很广，先立几个坐标，后面章节会展开：</p>
             <table>
-                <thead><tr><th>工程概念</th><th>跟 Attention / Transformer 的关系</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 Attention / Transformer 的关系</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>Context Engineering</td><td>上下文为什么「越长质量越容易滑坡」，根子就在注意力分布规律</td></tr>
-                    <tr><td>RAG Engineering</td><td>检索出来的多个 chunk 摆放顺序会影响注意力权重</td></tr>
-                    <tr><td>推理优化</td><td>Attention 的 O(n²) 计算复杂度直接决定了推理要花多少显存</td></tr>
-                    <tr><td>Long Context</td><td>本篇讲清 Attention 本身的机制和局限</td></tr>
+                    <tr><td>Context Engineering</td><td>上下文为什么「越长质量越容易滑坡」，根子就在本篇要讲的注意力分布规律</td></tr>
+                    <tr><td>RAG Engineering</td><td>检索出来的多个 chunk 塞进 Prompt 时，摆放顺序会影响模型对它们的「注意力权重」</td></tr>
+                    <tr><td>推理优化（Topic③：KV Cache / PagedAttention）</td><td>Attention 的计算复杂度直接决定了推理要花多少显存、多少时间——这些工程手段全是在给这篇讲的机制「打补丁提速」</td></tr>
+                    <tr><td>Long Context（后续专篇）</td><td>本篇讲清 Attention 本身的机制和局限；如何用 RoPE 外推、稀疏注意力等具体技术把上下文做长，会放到专门的 Long Context 一篇细讲，这里不重复</td></tr>
                 </tbody>
             </table>
+            <blockquote>💡 <strong>Attention 决定模型「当下在看什么」。Context Engineering 决定你「喂给它看什么」。两者配合不好，喂得再精心也没用。</strong></blockquote>
+
+            <!-- ========== 2、为什么不能直接用 RNN ========== -->
             <h2 id="why">二、为什么不能直接用 RNN 一步步处理？</h2>
+            <p>Transformer 出现之前，主流方案是 RNN / LSTM——按顺序逐个 Token 处理，把「记忆」压缩进一个隐藏状态，再传给下一步。</p>
             <table>
-                <thead><tr><th>方案</th><th>致命问题</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>RNN / LSTM</td><td>逐 Token 顺序处理，没法并行训练；序列一长，早期信息在层层传递中被稀释</td></tr>
-                    <tr><td>加大隐藏状态维度</td><td>治标不治本，长距离依赖问题依然存在</td></tr>
-                    <tr><td>CNN 卷积处理序列</td><td>单层只能看到窗口内的局部关系</td></tr>
+                    <tr>
+                        <td>RNN / LSTM</td>
+                        <td>逐 Token 顺序处理，把历史信息压进一个隐藏状态向量</td>
+                        <td>必须等前一个 Token 算完才能算下一个，没法并行训练；序列一长，早期信息在层层传递中被稀释甚至丢失</td>
+                    </tr>
+                    <tr>
+                        <td>加大隐藏状态维度</td>
+                        <td>试图用更大的向量装下更多历史信息</td>
+                        <td>治标不治本，长距离依赖问题依然存在，而且训练更慢</td>
+                    </tr>
+                    <tr>
+                        <td>CNN 卷积处理序列</td>
+                        <td>用固定窗口的卷积核扫过序列</td>
+                        <td>单层只能看到窗口内的局部关系，要看到很远的两个词，需要堆叠很多层，效率低</td>
+                    </tr>
                 </tbody>
             </table>
-            <p>Attention 的思路：<strong>不再依赖「一步步传递」的记忆，而是让每一个 Token 直接和序列里所有其他 Token 计算关联度，一步到位</strong>。</p>
-            <blockquote>💡 <strong>RNN 是「传纸条」。Attention 是「开一次全员会议」——每个 Token 都能直接和所有其他 Token 对话。</strong></blockquote>
+            <p>Attention 的思路完全不同：<strong>不再依赖「一步步传递」的记忆，而是让每一个 Token 直接和序列里所有其他 Token 计算关联度，一步到位</strong>。这正是论文标题里「你只需要注意力」的意思——把循环结构整个拿掉，只留注意力机制，训练可以完全并行，长距离依赖也不再需要层层传递。</p>
+            <blockquote>💡 <strong>RNN 是「传纸条」——信息一路传下去，传到后面容易失真。Attention 是「开一次全员会议」——每个 Token 都能直接和所有其他 Token 对话，不用等中间人转达。</strong></blockquote>
+
+            <!-- ========== 3、怎么工作的 ========== -->
             <h2 id="how">三、Attention 到底是怎么工作的？</h2>
-            <p>每个 Token 会算出三个向量：<strong>Query（我在找什么）、Key（我这里有什么）、Value（我实际携带的内容）</strong>。拿 Query 去和所有 Key 做匹配，匹配度高的文档，它的 Value 就会在最终结果里占更大权重。</p>
-            <p>两个关键设计：<strong>多头注意力（Multi-Head Attention）</strong>——并行算好几组不同的 Query/Key/Value，让不同的「头」分别学会关注不同类型的关系；<strong>位置编码（Positional Encoding）</strong>——Attention 本身对词的顺序不敏感，必须额外注入位置信号。</p>
+            <p>不写公式，讲直觉。</p>
+            <p>每个 Token 会算出三个向量：<strong>Query（我在找什么）、Key（我这里有什么）、Value（我实际携带的内容）</strong>。可以类比成一次搜索：Query 是你的搜索词，Key 是每篇文档的标题，Value 是文档的正文。拿 Query 去和所有 Key 做匹配，匹配度高的文档，它的 Value 就会在最终结果里占更大权重——这个「匹配度算出权重，再按权重加权求和」的过程，就是一次 Attention 计算。</p>
+            <p>对句子里的每一个词都做一遍这个过程，模型就得到了一份「这个词该多大程度上参考句子里其他每个词」的动态权重表——这正是 <strong>Attention Is All You Need</strong> 这篇论文里提出的核心机制，它把这个过程命名为 Self-Attention（自注意力），因为 Query、Key、Value 都来自同一段输入序列自身。</p>
+            <p>论文里还有两个关键设计：</p>
+            <ul>
+                <li><strong>多头注意力（Multi-Head Attention）</strong>：不只算一次，而是并行算好几组不同的 Query/Key/Value，让不同的「头」分别学会关注不同类型的关系——有的头可能更擅长捕捉语法结构，有的更擅长捕捉指代关系，最后把所有头的结果拼起来。</li>
+                <li><strong>位置编码（Positional Encoding）</strong>：Attention 本身对词的顺序不敏感——把一句话的词打乱重新算，数学上「谁和谁相关」的结果是一样的。所以必须额外给每个位置注入一个「我在第几位」的信号，模型才知道词序。</li>
+            </ul>
+            <blockquote>💡 <strong>多头注意力不只是为了算得快——是让模型同时用好几双「眼睛」看同一句话，一双看语法，一双看指代，一双看语义，最后拼在一起。</strong></blockquote>
+
+            <!-- ========== 4、怎么影响能力 ========== -->
             <h2 id="impact">四、Attention 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+
             <h3>为什么上下文越长，推理越贵、越慢？</h3>
-            <p>Self-Attention 计算量随序列长度呈平方级增长——上下文长度翻倍，计算量大约变成四倍。</p>
+            <p><strong>翻车现场</strong>：把 Prompt 从 2000 字加到 8000 字，感觉推理时间和成本涨得比字数涨得还快。</p>
+            <p><strong>根因</strong>：Self-Attention 要求每个 Token 都和序列里所有其他 Token 两两计算关联度，计算量随序列长度呈平方级增长——上下文长度翻倍，计算量大约变成四倍。这也是为什么 KV Cache、PagedAttention 这些推理优化技术会存在：它们本质上都是在想办法缓解这个平方级增长带来的显存和算力压力。</p>
+
             <h3>为什么关键信息放在长 Prompt 中间，模型经常「看不见」？</h3>
-            <p>这就是「Lost in the Middle」（中间遗忘）现象——实际训练出来的模型普遍对序列开头和结尾更敏感，中间部分的信息容易被「稀释」。</p>
+            <p><strong>翻车现场</strong>：把最重要的一段资料塞进一份很长的 Prompt 正中间，模型回答时却像完全没看到，反而对开头和结尾的内容记得很清楚。</p>
+            <p><strong>根因</strong>：这是被称为「Lost in the Middle」（中间遗忘）的现象——理论上 Attention 能让每个 Token 平等地关注所有位置，但实际训练出来的模型，注意力分布并不均匀，普遍对序列开头和结尾更敏感，中间部分的信息容易被「稀释」。这直接影响 RAG 和 Context Engineering 里的一个实操细节：把检索出来最相关的内容，尽量往开头或结尾摆，而不是埋在中间。</p>
+
             <h3>为什么训练时 4K 上下文的模型，硬塞 32K 进去会「变笨」？</h3>
-            <p>位置编码是在训练阶段针对特定长度范围学出来的，超出范围就是外推（extrapolation）失败。</p>
+            <p><strong>翻车现场</strong>：模型技术上能接受更长的输入，但真的喂进去很长的文本后，回答质量明显下滑，甚至开始前后矛盾。</p>
+            <p><strong>根因</strong>：位置编码是在训练阶段针对特定长度范围学出来的，超出训练时见过的长度范围，模型就在处理一批「没见过的位置信号」——这是典型的外推（extrapolation）失败。技术上能塞进去，不代表模型真的具备理解那么长距离关系的能力，这也是为什么「长上下文」需要专门的技术手段去扩展，不是简单加大输入框就能解决的。</p>
+            <blockquote>💡 <strong>上下文窗口的数字是个上限，不是承诺——写着支持 32K，不代表模型在 32K 长度下的理解力和 4K 时一样可靠。</strong></blockquote>
+
+            <!-- ========== 5、为什么开发者要懂 ========== -->
             <h2 id="engineering">五、为什么开发者一定要懂 Attention？</h2>
-            <p>「Why」：Context Engineering 里「精简上下文」的原则，根源在 O(n²) 计算成本和「中间遗忘」这两个底层约束。RAG 里检索结果的排序策略，「中间遗忘」意味着最相关的 chunk 放在开头或结尾效果更好。</p>
+            <p><strong>Context Engineering</strong>：为什么长上下文质量会滑坡，本篇给出的是机制层面的解释——平方级计算成本和「中间遗忘」现象，是应用层所有上下文管理技巧要绕开的两个底层约束。</p>
+            <p><strong>RAG Engineering</strong>：检索出多个 chunk 后怎么排序拼进 Prompt，不是无所谓的事——「中间遗忘」现象意味着把最相关的 chunk 放在开头或结尾，效果通常好于埋在中间。</p>
+            <p><strong>推理优化（Topic③）</strong>：KV Cache、PagedAttention、Speculative Decoding 这些工程手段，本质上都是在跟本篇讲的 O(n²) 计算复杂度打交道——理解了 Attention 的计算方式，才看得懂这些优化技术到底在优化什么。</p>
+            <p><strong>往下一篇的伏笔</strong>：Transformer 架构本身只是「形状」，真正让这套结构里装满知识的，是接下来要讲的 Pretraining——用海量数据反复训练，才能让 Attention 学会「该看哪里」。</p>
+
+            <!-- ========== 6、常见误区 ========== -->
+            <h2 id="wuqu">六、常见误区</h2>
+
+            <h3>误区一：Attention 会公平地关注所有位置</h3>
+            <p><strong>真相</strong>：理论上可以，实际训练出来的模型普遍对开头结尾更敏感，中间容易被稀释——这就是「Lost in the Middle」现象，不是 bug，是经验规律。</p>
+
+            <h3>误区二：上下文窗口写多大，模型就能稳定处理多长</h3>
+            <p><strong>真相</strong>：窗口大小是技术上限，实际可靠处理的长度往往受训练时见过的长度范围制约，超出范围会有外推问题，效果打折扣。</p>
+
+            <h3>误区三：Attention 就是 Transformer 的全部</h3>
+            <p><strong>真相</strong>：Transformer 架构里还有前馈网络、残差连接、Layer Norm 等组件协同工作，Attention 只是其中最具标志性、贡献了论文标题的那一部分，完整能力是各组件配合的结果。</p>
+
+            <h3>误区四：多头注意力只是为了并行加速</h3>
+            <p><strong>真相</strong>：多头的核心目的是让模型同时从多个「视角」捕捉不同类型的关系（语法、指代、语义等），并行只是附带的工程好处，不是设计初衷。</p>
+            <blockquote>💡 <strong>理解 Attention，不是为了自己去实现一个 Transformer，而是为了看懂后面所有「为什么长上下文会变差、为什么推理会变贵」的报错和现象，背后其实是同一套机制在起作用。</strong></blockquote>
+
+            <!-- ========== 7、总结 ========== -->
             <h2 id="jieyu">七、总结：一场没有中间人的全员会议</h2>
-            <p><strong>给小白的话</strong>：下次听到「这个模型上下文支持 32K」，可以多问一句——支持是技术参数，好不好用是另一回事。</p>
-            <p><strong>给开发者的话</strong>：理解 Self-Attention 的 O(n²) 代价、理解「中间遗忘」是经验规律而非偶发 bug——这两件事打通了，Context Engineering 里「为什么要精简上下文」、RAG Engineering 里「为什么排序要讲究」会一下子全部串起来。</p>
-            <blockquote>💡 <strong>Embedding 给了每个词一个起点，Attention 让这个起点学会了看着场合变。</strong></blockquote>
-            <p class="refs"><strong>参考资料</strong>：Vaswani et al., <em>Attention Is All You Need</em>（2017，Google）；Liu et al. 关于「中间遗忘」现象的相关研究</p>
+            <p><strong>给小白的话</strong>：下次听到「这个模型上下文支持 32K」，可以多问一句——支持是技术参数，好不好用是另一回事，中间容易「遗忘」是这类架构与生俱来的特点，不是哪家厂商没做好。</p>
+            <p><strong>给开发者的话</strong>：Attention Is All You Need 这篇论文用一个简单到近乎挑衅的标题，把整个行业的路线从「循环记忆」切换到「全员直连」。理解 Self-Attention 的 Query/Key/Value 机制、理解它 O(n²) 的计算代价、理解「中间遗忘」是经验规律而非偶发 bug——这三件事打通了，Context Engineering 里「为什么要精简上下文」、RAG Engineering 里「为什么排序要讲究」、推理优化里「为什么要做 KV Cache」，这些应用层的道理会一下子全部串起来。</p>
+            <blockquote>💡 <strong>Embedding 给了每个词一个起点，Attention 让这个起点学会了看着场合变——这一步，是模型第一次真正「读懂上下文」的地方。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Vaswani et al., <em>Attention Is All You Need</em>（2017，Google）；Liu et al. 关于长上下文「中间遗忘」现象的相关研究</p>
+
+            <!-- 跨文章导航：Foundation 专题第三篇，上一篇 Embedding，下一篇 Pretraining -->
             <nav class="article-nav">
-                <a href="embedding.html" class="nav-card nav-prev"><span class="nav-arrow">←</span><span class="nav-content"><span class="nav-label">上一篇</span><span class="nav-title">📐 Embedding</span></span></a>
-                <a href="pretraining.html" class="nav-card nav-next"><span class="nav-content"><span class="nav-label">下一篇</span><span class="nav-title">🌱 Pretraining</span></span><span class="nav-arrow">→</span></a>
+                <a href="embedding.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">📐 Embedding</span>
+                    </span>
+                </a>
+                <a href="pretraining.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一篇</span>
+                        <span class="nav-title">🌱 Pretraining</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
             </nav>
+
             <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
         </div>
     </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
@@ -92,6 +214,9 @@
         });
     })();
     </script>
-    <footer class="site-footer"><p>© 2026 · kipozannaki</p></footer>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
 </body>
 </html>
