@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：Reasoning Model（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reasoning Model · kipozannaki</title>
+    <meta name="description" content="为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧠 Reasoning Model</h1>
+            <p class="meta">为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能只靠Prompt引导</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></blockquote>
+            <h2>先说清楚：这篇和 Foundation 专题的 Reasoning 不是一回事</h2>
+            <p>Foundation 专题里有一篇 Reasoning，讲的是"为什么模型能/不能推理"这种<strong>机制层面</strong>的问题；本篇讲的是 o1、r1 这类具体的"推理模型"，工程上<strong>到底是怎么被训练出来的</strong>——两者层次不同，这里不重复机制讨论，只讲工程实现。</p>
+            <h2 id="intro">引言：为什么有些模型回答之前要先"想"很久？</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么 o1、r1 这类"推理模型"回答之前要先生成一大段"思考过程"，而普通对话模型是直接开始吐字？</li>
+                <li>为什么同样一道题，让模型多"想"一会儿，正确率能明显往上走？</li>
+                <li>为什么这类模型有时候会陷入"想太多"，思考了很久反而把一道本来很简单的题目搞错了？</li>
+                <li>链式思考（Chain-of-Thought）提示词很早就有人在用了，为什么 o1、r1 这种专门的"推理模型"是最近才出现的突破？</li>
+            </ul>
+            <p>这些问题的答案，都在这一代<strong>推理模型</strong>训练方式的变化里。它不是靠堆更大的预训练模型，也不是单纯靠提示词技巧，而是<strong>专门训练模型在给出最终答案之前，先生成一段很长的中间推理过程</strong>，并且这段推理过程本身是被强化学习训练出来的，不是提示词引导出来的表面效果。</p>
+            <blockquote>💡 <strong>普通模型是"张口就答"，推理模型是"先打草稿再誊抄"——差别不在嘴皮子利索不利索，在草稿本身有没有被专门训练过。</strong></blockquote>
+            <h2 id="zuobiao">Reasoning Model 在这套体系里的坐标</h2>
+            <p>这一篇建立在 Foundation 专题两篇的基础上：</p>
+            <pre><code>Foundation：Alignment（RLHF / DPO，奖励来自人类偏好排序）
+Foundation：Inference（Prefill + Decode，一次前向生成一个答案）
+    ↓
+Reasoning Model：用"答案是否正确"当奖励信号，训练模型生成更长的中间推理链条  ← 本篇
+    ↓
+Frontier：Test-Time Compute / Inference Scaling（下一篇：把"多算一会儿"变成可量化的能力提升）</code></pre>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>相关概念</th>
+                        <th>跟 Reasoning Model 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Foundation · Alignment</td>
+                        <td>训练方式同样是强化学习，但奖励信号从"人类主观偏好"变成了"客观可验证的正确性"——这条思路会在后面 RLVR 专篇继续展开</td>
+                    </tr>
+                    <tr>
+                        <td>Foundation · Inference</td>
+                        <td>推理成本的计算方式被改变了——不再是一次前向生成一个答案，而是先生成大量"思考"Token 再给出最终答案，直接推高延迟和成本</td>
+                    </tr>
+                    <tr>
+                        <td>Foundation · Reasoning</td>
+                        <td>那一篇讲机制（模型为什么能/不能推理），本篇讲工程实现（这类能力具体是怎么被训练出来的），本文开头已划清边界</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>Alignment 教会模型"该怎么回应"，Reasoning Model 教会模型"回应之前，值得先花时间想清楚"——这是同一套强化学习思路，换了一个优化目标。</strong></blockquote>
+            <h2 id="why">为什么不能只靠 Prompt 引导模型"一步步思考"？</h2>
+            <p>在专门的推理模型出现之前，业内常用的做法是<strong>链式思考提示词（Chain-of-Thought Prompting）</strong>——在提示词里加一句"请一步步思考"，引导模型把中间步骤写出来。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Chain-of-Thought 提示词</td>
+                        <td>提示词里要求模型"一步步思考"</td>
+                        <td>模型只是被引导输出"看起来像推理"的文字，本身没有被专门训练去做深层次的试错、回溯和自我纠错，遇到真正复杂的多步问题容易露馅</td>
+                    </tr>
+                    <tr>
+                        <td>单纯堆大预训练模型</td>
+                        <td>增大参数量，指望能力自然涌现出更强的推理</td>
+                        <td>对需要"试一条路走不通、退回来再试另一条路"这种非线性思考模式的任务，参数规模带来的边际改善有限</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>真正的突破是<strong>把"最终答案对不对"直接当成训练信号</strong>，用强化学习去优化模型生成推理过程的方式——不是靠提示词"劝"模型多想，而是从训练层面就奖励"想得更对"这件事本身。</p>
+            <blockquote>💡 <strong>提示词引导是"劝它想一想"，专门训练是"考核它想得对不对"——前者是建议，后者是硬性指标，效果自然不是一个量级。</strong></blockquote>
+            <h2 id="how">Reasoning Model 到底是怎么训练出来的？</h2>
+            <p>核心变化：从"一次性直接生成答案"，变成"先生成一段很长的中间推理过程（有时候不直接展示给用户），再给出最终答案"。</p>
+            <p>关键在训练方式上：用强化学习，把"最终答案是否正确"当作奖励信号——对于数学题、代码题这类有明确对错标准的任务，答案对不对是可以客观验证的，不需要像 RLHF 那样依赖人类标注者的主观偏好排序。模型在这种奖励机制下反复训练，逐渐学会了在推理过程中做类似"试一种思路→发现走不通→回溯→换一种思路"的非线性探索，而不是像 Chain-of-Thought 提示词那样，只是把一条想法线性地写出来。</p>
+            <p>这种能力的代价是<strong>推理成本大幅上升</strong>——生成的中间推理 Token 数量，往往是最终答案长度的几倍甚至几十倍，直接推高了延迟和 API 调用成本。这也是为什么这类推理模型通常比普通对话模型明显更贵、更慢。</p>
+            <blockquote>💡 <strong>模型不是"变聪明了"，是被允许（并且被奖励）在心里多打几次草稿——打草稿本身要花时间，这笔时间成本，最终会体现在你的账单和等待时长上。</strong></blockquote>
+            <h2 id="impact">Reasoning Model 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+            <h3>为什么简单问题也会被"想很久"，成本和延迟一起涨？</h3>
+            <p><strong>翻车现场</strong>：问一个非常简单的问题（比如基础算术），推理模型却生成了一大段思考过程才给出答案，响应时间和 Token 消耗比普通模型高出不少。</p>
+            <p><strong>根因</strong>：目前的推理模型还没有很好的机制去判断"这道题到底需不需要深度思考"，倾向于对所有问题套用相对固定、较长的思考流程。这是一个还在被持续优化的实际问题，也直接引出了下一篇 Test-Time Compute 要讲的话题——"该给一道题分配多少算力"本身可以成为一个可以调节的旋钮，而不是固定套路。</p>
+            <h3>为什么推理模型有时候会"想太多"，反而把简单题目搞错？</h3>
+            <p><strong>翻车现场</strong>：一道本来很直接的题目，模型的思考过程却在多个思路之间反复横跳、自我怀疑，最终给出的答案反而不如它思考过程中间某一步曾经得出的正确结论。</p>
+            <p><strong>根因</strong>：这类模型的推理过程本质是一种概率性搜索，不保证"想得越久，越接近正确答案"。有时候模型会对本来正确的中间结论产生不必要的自我怀疑，继续往下"想"反而引入了新的错误——这是训练目标（鼓励更多探索）带来的一个副作用，不是简单的 bug。</p>
+            <h3>为什么某些任务上，普通模型配合好的 Prompt，效果不输专门的推理模型？</h3>
+            <p><strong>翻车现场</strong>：把同一个任务同时喂给专门的推理模型和一个搭配了精心设计提示词的普通模型，发现某些任务类型上两者效果差不多，推理模型额外花掉的算力和时间显得不太划算。</p>
+            <p><strong>根因</strong>：推理模型的优势主要体现在需要多步骤、有明确对错标准、依赖试错搜索的任务上（比如数学证明、代码调试）；对于开放性强、没有唯一正确答案的任务，额外的"深度思考"带来的边际收益有限。这也是为什么选型时不能简单认为"推理模型全面强于普通模型"。</p>
+            <blockquote>💡 <strong>推理模型是"专精解题"的选手，不是"全能选手"——用错场景，多花的算力买不到对应的效果提升。</strong></blockquote>
+            <h2 id="engineering">为什么开发者一定要懂 Reasoning Model？</h2>
+            <p><strong>Prompt Engineering</strong>：面对推理模型，传统"请一步步思考"这类提示词技巧的价值被削弱了——模型已经内置了自己的推理机制，过度引导反而可能干扰它自己的思考路径。</p>
+            <p><strong>成本与延迟预算</strong>：调用推理模型时，要为"看不见的思考 Token"预留预算，不能只按最终展示出来的输出长度去估算调用成本。</p>
+            <p><strong>呼应 Alignment</strong>：训练目标从"人类主观偏好"转向"客观可验证的正确性"，这个思路会在后面 RLVR 专篇继续展开，理解这一篇是理解那一篇的基础。</p>
+            <p><strong>往下一篇的伏笔</strong>：本篇讲的是"推理模型"这个具体的产品形态，下一篇 Test-Time Compute 要讲的，是"用更多算力换更高正确率"这个更抽象、更普遍的规律本身——推理模型只是这个规律的一种具体实现方式。</p>
+            <h2 id="wuqu">常见误区</h2>
+            <h3>误区一：推理模型就是在普通模型基础上，多套了一层"请一步步思考"的 Prompt</h3>
+            <p><strong>真相</strong>：推理模型的推理能力是通过专门的强化学习训练出来的，不是靠提示词引导模拟出来的表面效果，两者的能力上限有本质差异。</p>
+            <h3>误区二：推理模型想得越久，正确率就一定越高</h3>
+            <p><strong>真相</strong>：目前观察到的规律更接近边际收益递减，过度思考在某些场景下甚至会引入新的错误，不是想得越久越好。</p>
+            <h3>误区三：推理模型适合所有任务，应该全面取代普通对话模型</h3>
+            <p><strong>真相</strong>：推理模型的优势集中在有明确对错标准、需要多步骤搜索的任务上，对开放性、创造性任务的边际收益有限，还会带来明显更高的成本和延迟。</p>
+            <h3>误区四：推理过程里展示出来的"思考文字"，就是模型真实的内部推理逻辑</h3>
+            <p><strong>真相</strong>：模型展示出来的思考过程是它生成的一段文本，不完全等同于其内部计算过程的真实写照，这中间存在一定的不透明性，不能完全按字面去理解模型"真的是这么想的"。</p>
+            <blockquote>💡 <strong>选不选用推理模型，先问自己一个问题：这个任务有没有明确的对错标准？有，推理模型大概率值得；没有，多花的算力可能只是在多打草稿，不一定多出正确答案。</strong></blockquote>
+            <h2 id="jieyu">总结：草稿本身，也是训练出来的</h2>
+            <p><strong>给小白的话</strong>：下次看到模型回答前"想了很久"，别急着觉得它慢——它很可能是在心里试了好几条路、否定了几个错误答案，才把最终结果交给你，这个过程本身是被专门训练出来的能力，不是磨蹭。</p>
+            <p><strong>给开发者的话</strong>：Reasoning Model 把强化学习的奖励信号从"人类主观偏好"换成了"客观可验证的正确性"，这个思路是这一代推理能力突破的核心。理解了这一点，才能判断什么任务值得为推理模型多付出的成本和延迟买单，也才能看懂后面 Test-Time Compute 那篇要讲的"算力换正确率"这条更普遍的规律，到底是从哪个具体产品形态里被提炼出来的。</p>
+            <blockquote>💡 <strong>打草稿不是浪费时间，是把"想"这件事本身，变成了一项可以被训练、被优化的能力——这是这一代推理模型真正的突破所在。</strong></blockquote>
+            <p><strong>参考资料</strong>：OpenAI 关于 o1 系列的相关技术说明；DeepSeek-R1 相关研究论文</p>
+
+            <nav class="article-nav">
+                <a href="test-time-compute.html" class="nav-card nav-next nav_full">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">⏱️ Test-Time Compute</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
