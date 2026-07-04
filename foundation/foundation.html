@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundation & Core Algorithms · kipozannaki</title>
+    <meta name="description" content="AI 底层基础与核心算法：模型结构、训练范式、推理优化等">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="foundation.html" class="active">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+    <section class="hero-compact">
+        <h1>Foundation & Core Algorithms</h1>
+        <p>AI 底层基础与核心算法 · 9 篇笔记（2026-07-03 更新）</p>
+    </section>
+    <div class="site-layout">
+        <aside class="sidebar">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="展开/收起导航" aria-label="展开或收起导航">›</button>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📂 专题</h3>
+                <a href="../application/application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
+                <a href="foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
+                <a href="../frontier/frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 本专题文章</h3>
+                <a href="tokenization.html" class="sidebar-item"><span class="icon">🪙</span><span class="text">Tokenization</span></a>
+                <a href="embedding.html" class="sidebar-item"><span class="icon">📐</span><span class="text">Embedding</span></a>
+                <a href="attention-transformer.html" class="sidebar-item"><span class="icon">🧠</span><span class="text">Attention / Transformer</span></a>
+                <a href="pretraining.html" class="sidebar-item"><span class="icon">🌱</span><span class="text">Pretraining</span></a>
+                <a href="alignment.html" class="sidebar-item"><span class="icon">🎯</span><span class="text">Alignment</span></a>
+                <a href="inference.html" class="sidebar-item"><span class="icon">⚡</span><span class="text">Inference</span></a>
+                <a href="moe.html" class="sidebar-item"><span class="icon">🧩</span><span class="text">MoE</span></a>
+                <a href="long-context.html" class="sidebar-item"><span class="icon">📏</span><span class="text">Long Context</span></a>
+                <a href="multimodal.html" class="sidebar-item"><span class="icon">🖼️</span><span class="text">Multimodal</span></a>
+            </div>
+        </aside>
+        <main>
+            <section class="section">
+                <h2>🧬 专题说明</h2>
+                <p>这一专题聚焦"AI 本身是怎么工作的"：</p>
+                <ul>
+                    <li><strong>模型结构</strong>　Transformer / Attention 的设计与变体</li>
+                    <li><strong>训练范式</strong>　预训练 / SFT / RLHF / DPO 的链路与权衡</li>
+                    <li><strong>推理优化</strong>　KV Cache、量化、Speculative Decoding</li>
+                    <li><strong>评测方法</strong>　怎么测一个模型"真的"变好</li>
+                </ul>
+            </section>
+            <section class="section">
+                <h2>📚 本专题文章</h2>
+                <div class="articles-grid">
+                    <a href="tokenization.html" class="article-card"><div class="article-icon">🪙</div><h3>Tokenization</h3><p>为什么 AI 根本没有看过文字？中文更贵、XML 更好、AI 数不清字母？</p></a>
+                    <a href="embedding.html" class="article-card"><div class="article-icon">📐</div><h3>Embedding</h3><p>为什么换个 Embedding 模型 RAG 检索全崩？一篇讲清向量空间的世界。</p></a>
+                    <a href="attention-transformer.html" class="article-card"><div class="article-icon">🧠</div><h3>Attention / Transformer</h3><p>为什么一篇论文敢把标题写成「你只需要注意力」？</p></a>
+                    <a href="pretraining.html" class="article-card"><div class="article-icon">🌱</div><h3>Pretraining</h3><p>为什么模型会一本正经编造事实？一篇讲清预训练到底在往模型里灌什么。</p></a>
+                    <a href="alignment.html" class="article-card"><div class="article-icon">🎯</div><h3>Alignment</h3><p>为什么同一个底座模型对齐之后判若两人？一篇讲清 SFT / RLHF / DPO。</p></a>
+                    <a href="inference.html" class="article-card"><div class="article-icon">⚡</div><h3>Inference</h3><p>为什么第一个字慢、后面的字快？一篇讲清 Prefill / Decode / KV Cache。</p></a>
+                    <a href="moe.html" class="article-card"><div class="article-icon">🧩</div><h3>MoE</h3><p>为什么「参数量」要拆成两个数字讲？一篇讲清混合专家模型。</p></a>
+                    <a href="long-context.html" class="article-card"><div class="article-icon">📏</div><h3>Long Context</h3><p>为什么号称支持 128K，用到接近上限时效果就开始打折？</p></a>
+                    <a href="multimodal.html" class="article-card"><div class="article-icon">🖼️</div><h3>Multimodal</h3><p>为什么高清图塞进去原本灵光的指令直接废了？一篇讲清多模态底层。</p></a>
+                </div>
+            </section>
+        </main>
+    </div>
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+    <script>
+    (function() {
+        const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { } };
+        const savedTheme = safeGet('theme');
+        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (sysDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        if (safeGet('reading') === '1') document.body.classList.add('reading-mode');
+        if (safeGet('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
+        const themeBtn = document.getElementById('theme-toggle');
+        const readBtn = document.getElementById('reading-toggle');
+        const sideBtn = document.getElementById('sidebar-toggle');
+        if (theme === 'dark') themeBtn.classList.add('active');
+        if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+        themeBtn.addEventListener('click', function() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            themeBtn.classList.toggle('active');
+            safeSet('theme', next);
+        });
+        readBtn.addEventListener('click', function() {
+            document.body.classList.toggle('reading-mode');
+            const on = document.body.classList.contains('reading-mode');
+            readBtn.classList.toggle('active');
+            safeSet('reading', on ? '1' : '0');
+        });
+        sideBtn.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-open');
+            const on = document.body.classList.contains('sidebar-open');
+            safeSet('sidebarOpen', on ? '1' : '0');
+        });
+    })();
+    </script>
+</body>
+</html>
