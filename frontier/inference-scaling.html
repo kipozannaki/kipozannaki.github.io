@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：Inference Scaling（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inference Scaling · kipozannaki</title>
+    <meta name="description" content="为什么小模型配合更多推理时搜索，有时候能追上大模型？一篇讲清推理时算力和效果提升之间，到底是什么样的定量关系。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>📈 Inference Scaling</h1>
+            <p class="meta">为什么小模型配合更多推理时搜索，有时候能追上大模型？一篇讲清推理时算力和效果提升之间，到底是什么样的定量关系。</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么需要一套新的定量规律</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></blockquote>
+            <h2 id="intro">引言：算力不只能花在训练上</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么"用更多算力换更强能力"这件事，现在要分成"训练时"和"推理时"两条完全不同的曲线来看？</li>
+                <li>为什么有研究发现，某些预算区间内，一个小模型配合大量推理时搜索，能追上甚至超过一个大模型一次生成的效果？</li>
+                <li>为什么"推理时多花算力"带来的收益，增长到一定程度就会明显变平，不是无限往上涨？</li>
+                <li>为什么同样多花一倍的推理算力，在简单任务和困难任务上，带来的收益完全不是一回事？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>Inference Scaling（推理时扩展）</strong>这套研究里。上一篇 Test-Time Compute 讲的是"有哪些具体方法可以在推理阶段多花算力"，本篇要讲的，是把这些方法用下去之后的效果，用类似 Pretraining 那篇提到的 Scaling Laws 的思路，量化成一条可以被观察、被拟合的曲线。</p>
+            <blockquote>💡 <strong>Test-Time Compute 是"有哪些工具可以多花力气"，Inference Scaling 是"多花的力气，换回来多少分"——前者是工具箱，后者是这些工具的性价比说明书。</strong></blockquote>
+            <h2 id="zuobiao">Inference Scaling 在这套体系里的坐标</h2>
+            <pre><code>Foundation：Pretraining（Scaling Laws：训练时参数量/数据量/算力，跟效果的关系）
+    ↓
+Frontier：Test-Time Compute（推理时有哪些花算力的具体方法）
+    ↓
+Frontier：Inference Scaling（这些方法花下去，收益曲线是什么形状）  ← 本篇
+    ↓
+Frontier：MCTS / Tree Search（下一篇：一种更高效花掉推理算力预算的具体搜索算法）</code></pre>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>相关概念</th>
+                        <th>跟 Inference Scaling 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Foundation · Pretraining（Scaling Laws）</td>
+                        <td>同一套研究方法论——用实验数据拟合"投入规模"和"效果提升"的关系——被搬到了一个新维度（推理时算力）上，理解了训练时那套，这套更容易上手</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier · Test-Time Compute</td>
+                        <td>上一篇讲方法论（有哪些方法），本篇讲这些方法的定量表现（花下去效果怎么变），两篇合起来才是完整的决策框架</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier · MCTS / Tree Search</td>
+                        <td>一种具体的搜索算法，可以理解为"怎么更高效地花掉推理算力预算"的一种技术方案，留给下一篇细讲</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>Pretraining 的 Scaling Laws 问的是"练得越久越强吗"，Inference Scaling 问的是"考试时想得越久越强吗"——是同一种研究思路，换了一个被观察的对象。</strong></blockquote>
+            <h2 id="why">为什么需要一套新的定量规律？</h2>
+            <p>传统认知里，模型效果由训练阶段的参数量、数据量、训练算力这三者决定——推理阶段只是"使用"这个已经训练好的模型，效果被默认是固定的、不会再变的。</p>
+            <p>但实际观察发现：<strong>同一个训练好的模型，如果推理时多花算力（多次采样投票、更长推理链条、验证器打分），效果会有明显提升</strong>。这说明"推理时投入的算力"本身，是一个独立的、能影响最终效果的变量——既然如此，就值得用类似 Pretraining Scaling Laws 的方式，专门去研究这个新维度上的规律：投入多少推理算力，大概能换回多少效果提升。</p>
+            <blockquote>💡 <strong>训练时的 Scaling Laws 假设"模型一旦练完，能力就定型了"；Inference Scaling 打破了这个假设——原来交卷前多花点时间，分数还能再往上挪一挪。</strong></blockquote>
+            <h2 id="how">Inference Scaling 到底在研究什么？</h2>
+            <p>核心问题：<strong>给定同样的总算力预算，应该花在"训练一个更大的模型"上，还是花在"用一个较小模型、但推理时搜索更多次"上，哪个更划算？</strong> 这类"计算最优"（Compute-Optimal）权衡研究，是这个领域的核心议题之一。</p>
+            <p>观察到的普遍规律：推理时投入的算力（比如采样次数、推理链条长度）和效果提升之间，通常呈现出类似对数曲线的关系——一开始投入算力，效果提升很快；但随着投入越来越多，提升速度明显放缓，也就是边际递减。这条曲线的具体形状，可以通过实验测量、拟合出数学规律，跟 Pretraining 那篇讲的 Scaling Laws 是同一类研究方法，只是研究对象换成了推理阶段。</p>
+            <p>一个值得注意的发现：在某些任务难度和预算区间内，"小模型＋更多推理时计算"确实可以在总算力消耗相近的情况下，接近甚至超过"大模型＋一次生成"的效果——但这个结论不是无条件成立的，依赖具体任务类型和预算规模。</p>
+            <p>任务难度是这条曲线里的一个关键变量：简单任务上，多花推理算力的边际收益很快趋于零（模型一次就能答对，重复算没有意义）；困难任务上，收益曲线会持续更久才趋于平缓。这也是为什么理想情况下，"该给一个任务分配多少推理算力"应该根据任务难度动态调整，而不是所有任务一刀切用同一套预算。</p>
+            <blockquote>💡 <strong>这条曲线告诉你的核心信息是：多花算力有用，但用处会越来越小——什么时候该停手，比什么时候该开始花，更需要数据支撑。</strong></blockquote>
+            <h2 id="impact">Inference Scaling 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+            <h3>为什么"该用大模型还是小模型加更多搜索"没有一个固定答案？</h3>
+            <p><strong>翻车现场</strong>：两个团队，一个坚持用超大模型一次生成，一个用中等模型配合大量推理时搜索，在某个预算下测出来效果接近；换了另一个预算区间或任务难度，结论却完全反过来。</p>
+            <p><strong>根因</strong>：训练时算力和推理时算力之间的"最优配比"，会随着任务难度、预算总量、具体应用场景变化而变化，不存在一个放之四海而皆准的固定比例——这也是为什么 Scaling Law 式的研究要针对具体场景反复验证，不能直接套用别人论文里的结论。</p>
+            <h3>为什么给简单任务分配大量推理时算力，是纯粹的浪费？</h3>
+            <p><strong>翻车现场</strong>：给一个模型一次就能答对的简单问题，强行套用"多次采样加投票"或者"更长推理链条"，发现正确率几乎没有任何提升，但成本和延迟却明显增加了。</p>
+            <p><strong>根因</strong>：推理时计算的收益曲线在简单任务上很快就会趋于平缓，甚至从一开始就已经接近饱和，继续追加推理算力换不来对应的效果提升。这也是为什么理想的系统应该有机制去判断"这道题值不值得多花算力"，而不是无差别地套用同一套推理预算。</p>
+            <h3>为什么"推理时扩展能替代训练时扩展"这个说法经常被过度解读？</h3>
+            <p><strong>翻车现场</strong>：看到相关研究后，有人直接得出"以后不用训练大模型了，小模型加推理时搜索就够了"这种结论，实际应用中却发现远没有那么简单——很多任务上，底座模型能力本身的天花板依然是决定性因素。</p>
+            <p><strong>根因</strong>：推理时计算能放大和更好利用模型已有的能力，但没法创造模型压根不具备的能力——比如底座模型压根不知道某个事实，单纯靠多次采样投票，也生成不出正确答案。这类研究结论经常在传播过程中被简化，丢失了"在什么条件下成立"这个重要前提。</p>
+            <blockquote>💡 <strong>推理时计算是放大镜，不是变魔术的手——它能把模型已经会的东西发挥得更充分，但填不上模型压根不会的空白。</strong></blockquote>
+            <h2 id="engineering">为什么开发者一定要懂 Inference Scaling？</h2>
+            <p><strong>呼应 Pretraining 的 Scaling Laws</strong>：这是同一套研究方法论（用实验数据拟合规模与效果的关系），被扩展应用到了一个新维度（推理时算力）上——理解了一个，另一个更容易上手。</p>
+            <p><strong>选型与预算决策</strong>：面对具体任务，与其凭感觉决定"要不要用推理时计算"，更合理的方式是先做小规模测试，观察收益曲线在什么位置开始趋于平缓，再决定预算怎么分配。</p>
+            <p><strong>呼应 Test-Time Compute</strong>：上一篇讲的是"有哪些方法"，本篇讲的是"这些方法该花多少、什么时候不值得再花"——两篇合起来才是一个完整的决策框架，不是两个孤立的知识点。</p>
+            <p><strong>往下一篇的伏笔</strong>：本篇讲清楚了"多花算力大致能换来什么"，下一篇 MCTS / Tree Search 要讲的，是一种具体的搜索算法——怎么更聪明地分配这些推理算力，而不是简单粗暴地多采样、多投票。</p>
+            <h2 id="wuqu">常见误区</h2>
+            <h3>误区一：只要预算够，推理时计算可以无限提升效果</h3>
+            <p><strong>真相</strong>：收益曲线存在明显的边际递减，超过某个点之后，继续追加推理算力换来的提升微乎其微，不是无限投入就能无限提升。</p>
+            <h3>误区二：小模型加更多推理时计算，总能在总成本相近的情况下追上大模型</h3>
+            <p><strong>真相</strong>：这个结论依赖具体任务难度和预算区间，不是普遍成立的规律，推理时计算没法凭空补足底座模型完全不具备的能力。</p>
+            <h3>误区三：所有任务都应该套用同一套推理时计算预算</h3>
+            <p><strong>真相</strong>：任务难度是关键变量——简单任务上多花算力的收益很快趋于零，困难任务上收益曲线会持续更久，理想情况下预算应该按任务难度动态分配。</p>
+            <h3>误区四：Inference Scaling 的研究结论可以直接套用到自己的场景里</h3>
+            <p><strong>真相</strong>：这类 Scaling Law 式的研究结论通常是在特定任务集、特定模型规模下测出来的，换一个场景，最优配比可能完全不同，直接照搬别人论文里的具体数字容易踩坑。</p>
+            <blockquote>💡 <strong>别问"推理时计算有没有用"，问"在我的任务难度和预算区间里，这条收益曲线现在处在陡峭段还是平缓段"——答案会完全不一样。</strong></blockquote>
+            <h2 id="jieyu">总结：多花的每一分算力，都要问值不值</h2>
+            <p><strong>给小白的话</strong>：下次听说"某个小模型配合更多搜索追上了大模型"，可以多问一句——是在什么任务、什么预算下追上的，这类结论很少是无条件成立的。</p>
+            <p><strong>给开发者的话</strong>：Inference Scaling 把"推理时算力"变成了一个和训练时参数量并列的、值得单独研究的变量，但它遵循和训练时 Scaling Laws 类似的边际递减规律——多花算力有用，但用处会越来越小。真正的工程决策，是先测出自己任务在这条曲线上的具体位置，再决定预算怎么分配，而不是照搬某篇论文里的结论。</p>
+            <blockquote>💡 <strong>训练决定了模型能力的天花板，推理时计算决定了这次回答有没有把天花板下的能力真正用满——这条曲线告诉你的，是"用满"这件事，本身也有性价比可言。</strong></blockquote>
+            <p><strong>参考资料</strong>：Snell et al. 关于测试时计算 Scaling 的相关研究；OpenAI、DeepMind 等机构关于推理时扩展（Inference-Time Scaling）的相关讨论</p>
+
+            <nav class="article-nav">
+                <a href="test-time-compute.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">⏱️ Test-Time Compute</span>
+                    </span>
+                </a>
+                <a href="mcts-tree-search.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🌳 MCTS / Tree Search</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
