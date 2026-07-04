@@ -1,17 +1,20 @@
 <!DOCTYPE html>
+<!-- 文章页：Tokenization — Foundation & Core Algorithms 专题第一篇 -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tokenization · kipozannaki</title>
     <meta name="description" content="为什么中文更贵、XML 更好、AI 数不清字母？一篇讲清 Token 的世界。">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
     <script>
     (function() {
         try {
             var saved = localStorage.getItem('theme');
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
-        } catch (e) { }
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
     })();
     </script>
     <link rel="stylesheet" href="../style.css">
@@ -22,15 +25,20 @@
         <nav class="site-nav">
             <a href="../application/application.html">Application</a>
             <a href="foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
         </nav>
     </header>
+
     <article class="article-page">
         <header class="article-header">
             <h1>🪙 Tokenization：为什么 AI 根本没有看过文字？</h1>
             <p class="meta">为什么中文更贵、XML 更好、AI 数不清字母？一篇讲清 Token 的世界 · 双栖科普</p>
         </header>
         <div class="article-body">
+
             <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不直接读文字</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#shizhan">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <!-- ========== 0、引言 ========== -->
             <h2 id="intro">零、引言："Token 不就是字数吗？"</h2>
             <p>先扔几个问题，看你中过几个：</p>
             <ul>
@@ -40,9 +48,14 @@
                 <li>为什么 XML 标签在 Prompt 里比特殊符号更稳定？</li>
                 <li>为什么一段 Base64 能瞬间吃掉几万 Token？</li>
             </ul>
+            <p>这五个问题看着风马牛不相及——一个像财务问题，一个像架构设计，一个像翻车笑话，一个像工程经验，一个像性能坑。但<strong>它们其实是同一个问题</strong>。</p>
             <p>答案只有一句话：<strong>AI 根本没有看到文字。它看到的全部东西，叫 Token。</strong></p>
             <blockquote>💡 <strong>你以为模型在读你的话。实际上，它连一个汉字都没见过。</strong></blockquote>
+
+            <!-- ========== 1、坐标 ========== -->
             <h2 id="zuobiao">一、Tokenization 在 AI 世界里的坐标</h2>
+            <p>这一章不是下定义，而是回答一个问题：<strong>Tokenization 在整个 LLM Pipeline 里到底负责什么？</strong></p>
+            <p>先画一张知识地图——你打出去的字，到模型吐出回答，中间经历了什么：</p>
             <pre><code>Human Language（你输入的文字）
     ↓
 Tokenizer（把文字切成 Token）
@@ -56,54 +69,170 @@ Transformer（在向量空间里做注意力运算）
 Inference（逐 Token 预测下一个 Token）
     ↓
 LLM（把 Token ID 序列映射回文字，返回给你）</code></pre>
-            <p>Tokenization 卡在<strong>人类语言和数学运算之间</strong>——它是文字进入 AI 世界的第一道门。</p>
+            <p>Tokenization 卡在<strong>人类语言和数学运算之间</strong>——它是文字进入 AI 世界的第一道门。过了这道门，后面全是向量、矩阵、概率分布，没有一个环节再跟"字"有关系。</p>
+            <p>但这道门的影响远不止 Pipeline 内部。往外看，工程世界里几乎所有关键概念都跟 Token 有关：</p>
             <table>
-                <thead><tr><th>工程概念</th><th>跟 Token 的关系</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 Token 的关系</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <tr><td>Prompt Engineering</td><td>你写的 Prompt，模型看到的是一串 Token ID，不是汉字</td></tr>
                     <tr><td>Context Engineering</td><td>Context Window 的容量单位是 Token，不是字符数</td></tr>
                     <tr><td>RAG</td><td>Chunk 按 Token 数切，不是按页数切</td></tr>
                     <tr><td>Agent</td><td>Memory 压缩的本质是减少 Token 数</td></tr>
                     <tr><td>API Cost</td><td>计费单位是 Token，成本优化就是 Token 优化</td></tr>
+                    <tr><td>Memory</td><td>历史对话能塞多少，不看你说了多少字，看占了多少 Token</td></tr>
                 </tbody>
             </table>
+            <blockquote>💡 <strong>Prompt 决定说什么。Context 决定放什么。Tokenization 决定模型究竟看到了什么。</strong></blockquote>
+
+            <!-- ========== 2、为什么不直接读文字 ========== -->
             <h2 id="why">二、为什么 AI 没有直接阅读文字？</h2>
+            <p>一个看似很蠢但必须问的问题：<strong>为什么不让模型直接读字？</strong></p>
+            <p>不是没试过。NLP 历史上，研究者把能想到的方案全部试了一遍，每一种都死在某个致命缺陷上：</p>
             <table>
-                <thead><tr><th>方案</th><th>怎么切</th><th>致命问题</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么切</th>
+                        <th>优点</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>按字符</td><td>一个字一个 ID</td><td>序列太长，Attention O(n²) 直接炸</td></tr>
-                    <tr><td>按单词</td><td>一个词一个 ID</td><td>词表爆炸，生词变 &lt;UNK&gt;</td></tr>
-                    <tr><td>按句子</td><td>一句话一个 ID</td><td>完全没有泛化能力</td></tr>
+                    <tr>
+                        <td>按字符</td>
+                        <td>一个字一个 ID</td>
+                        <td>不会遇到生词，覆盖 100%</td>
+                        <td>序列太长，Transformer 的注意力计算是 O(n²)，直接炸</td>
+                    </tr>
+                    <tr>
+                        <td>按单词</td>
+                        <td>一个词一个 ID</td>
+                        <td>序列短，语义完整</td>
+                        <td>词表爆炸——英文几百万词，中文组合无穷。遇到生词直接变 &lt;UNK&gt;</td>
+                    </tr>
+                    <tr>
+                        <td>按句子</td>
+                        <td>一句话一个 ID</td>
+                        <td>语义最完整</td>
+                        <td>完全没有泛化能力——换一种说法就不认识了</td>
+                    </tr>
                 </tbody>
             </table>
-            <p>NLP 最终收敛到了折中方案：<strong>Subword（子词）</strong>——把高频出现的"字母组合"当作最小单元。</p>
-            <h2 id="how">三、Tokenizer 到底是怎么工作的？</h2>
-            <p>BPE 核心逻辑：<strong>反复合并最高频的相邻对</strong>。没有语义理解，没有语法规则，纯粹是统计。</p>
-            <blockquote>💡 <strong>Tokenizer 学到的不是语义，只是高频组合。</strong></blockquote>
-            <h2 id="impact">四、Token 会如何影响模型能力？</h2>
-            <h3>为什么 GPT 数不清 "strawberry" 里有几个 r？</h3>
-            <p>Tokenizer 切出来的是类似 <code>str-aw-berry</code> 这样的片段——每个 Token 内部的具体字母，模型根本看不到。</p>
-            <h3>为什么中文更贵？</h3>
-            <p>大多数主流 Tokenizer 的训练语料以英文为主。同样信息量，中文需要的 Token 数更多。</p>
-            <h3>为什么 Base64 能瞬间吃掉几万 Token？</h3>
-            <p>Base64 字符分布完全随机，Tokenizer 退化到几乎逐字符切分。</p>
-            <h2 id="engineering">五、为什么开发者一定要懂 Token？</h2>
-            <p>Prompt Engineering：为什么 XML / JSON / Markdown 更稳定？因为它们在训练语料里大量出现，通常被切成完整 Token。</p>
-            <p>Context Engineering：窗口统计的是 Token，不是字符。不同语言的 Token/字符比完全不同。</p>
-            <p>RAG：Chunk 按 Token 切，不是按页切。</p>
-            <p>Agent：Memory 压缩的目标就是把 Token 数压回安全范围。</p>
-            <h2 id="shizhan">六、常见误区</h2>
+            <p>三条路都走不通，NLP 最终收敛到了一个折中方案：<strong>Subword（子词）</strong>。</p>
+            <p>核心思想很简单：不切完整单词，而是把高频出现的"字母组合"当作最小单元。这样：</p>
             <ul>
-                <li><strong>误区一：Token ≈ 字数</strong>——1 个中文字符 ≈ 1~2 个 Token</li>
-                <li><strong>误区二：Token ≈ 单词</strong>——高频单词如 "the" 是一个 Token，"university" 可能是两个</li>
-                <li><strong>误区三：减少字符就能减少 Token</strong>——缩写可能恰好跟你省掉的高频组合一样大</li>
-                <li><strong>误区四：不同模型的 Tokenizer 差不多</strong>——每个模型的 Tokenizer 是独立训练的</li>
+                <li>生僻词可以拆成几个常见片段，不会变 &lt;UNK&gt;</li>
+                <li>序列长度可控，不会被字符级方案拖垮</li>
+                <li>词表大小可控，不会被单词级方案撑爆</li>
             </ul>
+            <blockquote>💡 <strong>Tokenization 不是"最优解"，是 NLP 撞了所有南墙之后找到的"最不差解"。</strong></blockquote>
+
+            <!-- ========== 3、怎么工作的 ========== -->
+            <h2 id="how">三、Tokenizer 到底是怎么工作的？</h2>
+            <p>Subword 是思路，落地靠的是具体算法。三家主流方案——<strong>BPE、WordPiece、SentencePiece</strong>——思路相近但不完全一样。</p>
+            <p>这里不讲公式，用一个例子说清楚 BPE 的核心逻辑：</p>
+            <pre><code>假设词表里最初只有单个字母：
+l, o, w, e, r, ...
+
+第一步：扫描所有训练文本，找到出现频率最高的相邻字母对
+        "l" + "o" 出现了最多次 → 合并成 "lo"
+
+第二步：词表变成：l, o, w, e, r, ..., lo
+
+第三步：继续扫描，"lo" + "w" 出现了最多次 → 合并成 "low"
+
+第四步：词表变成：l, o, w, e, r, ..., lo, low
+
+一直重复，直到词表达到预定大小（比如 GPT-4 的 100,000 个 Token）</code></pre>
+            <p>整个过程就这一件事：<strong>反复合并最高频的相邻对</strong>。没有语义理解，没有语法规则，纯粹是统计——哪个组合出现得多，就把它变成一个 Token。</p>
+            <p>这意味着一个反直觉的事实：</p>
+            <blockquote>💡 <strong>Tokenizer 学到的不是语义，只是高频组合。</strong> "low" 是一个 Token，不是因为 Tokenizer 知道它是一个单词，而是因为 "l-o-w" 这三个字母在训练数据里老挨在一起。</blockquote>
+
+            <!-- ========== 4、怎么影响能力 ========== -->
+            <h2 id="impact">四、Token 会如何影响模型能力？</h2>
+            <p>这是全文高潮。不讲算法，只讲<strong>真实案例</strong>——每一个都是开发者踩过的坑。</p>
+
+            <h3>为什么 GPT 数不清 "strawberry" 里有几个 r？</h3>
+            <p><strong>翻车现场</strong>：你问 GPT"strawberry 这个单词里有几个字母 r？"，它能给你报出 1 个、2 个、3 个——每次答案还不一样。</p>
+            <p><strong>错在哪</strong>：不是推理能力不行。是因为 Tokenizer 根本没有把 "strawberry" 切成 <code>s-t-r-a-w-b-e-r-r-y</code>。它切出来的是类似 <code>str-aw-berry</code> 这样的片段——每个 Token 内部的具体字母，模型根本看不到。它只能"猜"。</p>
+            <p>这跟让一个只看过乐高成品的人去数"这个模型里到底有几块红色积木"是同一个道理——他只能拆开看，但他拆不开。</p>
+
+            <h3>为什么中文更贵？</h3>
+            <p><strong>翻车现场</strong>：同样一段意思，中文版消耗的 Token 比英文版多不少。</p>
+            <p><strong>根因</strong>：不是中文"复杂"。大多数主流 Tokenizer 的训练语料以英文为主，导致一个英文单词往往就是一个 Token，而一个中文字符往往需要 1~2 个 Token——有些生僻字甚至被拆成多个字节对应多个 Token。同样的信息量，中文需要的 Token 数更多，API 调用就更贵。</p>
+            <blockquote>💡 <strong>中文更贵，不是语言的锅，是 Tokenizer 训练数据里英文占比太高。</strong></blockquote>
+
+            <h3>为什么 Base64 能瞬间吃掉几万 Token？</h3>
+            <p><strong>翻车现场</strong>：一张小图片转成 Base64 塞进 Prompt，没写几句话 Context Window 直接爆了。</p>
+            <p><strong>根因</strong>：Base64 的字符分布完全随机——不像自然语言有高频组合。Tokenizer 面对随机字符串时，退化到几乎逐字符切分，每个字符变一个 Token。一段 3 万字符的 Base64，轻松吃掉 3 万 Token。</p>
+
+            <h3>为什么代码和自然语言的 Token 完全不同？</h3>
+            <p><strong>关键事实</strong>：代码里的缩进（空格/tab）也会占 Token。一个缩进狂魔的 Python 文件，空格可能吃掉 10%~20% 的 Context 预算。而自然语言里的空格几乎不占 Token——因为 Tokenizer 训练时已经把"单词 + 前面的空格"合成一个 Token 了。</p>
+            <blockquote>💡 <strong>同样 1000 个字符，Base64 ≈ 1000 个 Token，英文 ≈ 300 个 Token——差的是 Tokenizer 对"模式"的识别能力。</strong></blockquote>
+
+            <!-- ========== 5、为什么开发者要懂 ========== -->
+            <h2 id="engineering">五、为什么开发者一定要懂 Token？</h2>
+            <p>这一章把 Tokenization 接回整个工程体系——前面 Application 专题讲的所有手艺，底层都跟 Token 有关。</p>
+
+            <h3>Prompt Engineering：为什么 XML / JSON / Markdown 更稳定？</h3>
+            <p>prompt-engineering.html 里强调过用 XML 标签结构化。为什么 XML 标签比特殊符号（比如 <code>###</code>、<code>===</code>）更稳定？</p>
+            <p>因为 XML 标签在训练语料里大量出现——<code>&lt;instructions&gt;</code>、<code>&lt;data&gt;</code> 这类标签通常被切成一到两个完整 Token，模型对它们有稳定表征。而你自己发明的特殊符号组合 <code>###---===</code>，大概率被切成零散的 Token 碎片——同一个分隔符在不同位置可能被切成不同的 Token 序列，模型很难形成稳定理解。</p>
+            <blockquote>💡 <strong>Prompt 写得好不好，拼的不只是措辞——你选的结构能不能在 Tokenizer 手里"全身而退"，直接决定模型能不能稳定读懂。</strong></blockquote>
+
+            <h3>Context Engineering：Context Window 统计的是 Token，不是字符</h3>
+            <p>context-engineering.html 的核心信条"上下文是工作台不是仓库"，它的计量单位就是 Token。你以为是 100K 字符的窗口？实际上可能是 30K 英文单词，或者 20K 中文字符——因为不同语言的 Token / 字符比完全不同。</p>
+            <p>做上下文预算，不能按"还能塞多少字"来算，必须按"还能塞多少 Token"来算。</p>
+
+            <h3>RAG：Chunk 按 Token 切，不是按页切</h3>
+            <p>做检索增强生成，切 Chunk 的时候很多新手按"每页 500 字"来切。但 Embedding 模型的输入也是 Token——按字数切的 Chunk，Token 数波动巨大，有的 200 有的 800，检索质量直接受影响。</p>
+
+            <h3>Agent：Memory 必须压缩</h3>
+            <p>agent.html 里上下文膨胀的翻车现场——Agent 跑了几轮后对话历史塞爆窗口——本质上就是 Token 数失控。动态摘要、滑窗机制，这些 Memory 策略的目标都是同一个：<strong>把 Token 数压回安全范围</strong>。</p>
+
+            <h3>API 成本优化就是 Token 优化</h3>
+            <p>把 API 调用从 1 块降到 3 毛，路径只有两条：换更便宜的模型，或者<strong>减少 Token 消耗</strong>。而减少 Token 消耗的方法——精简 Prompt、裁剪 Payload、压缩历史——全是 Application 专题讲过的手艺。</p>
+
+            <h3>多模态：图片最终也会 Tokenize</h3>
+            <p>这个坑深，这里只埋个伏笔：视觉模型不是直接"看"图片的。图片被切成 Patch，每个 Patch 被映射成一个向量——本质上就是把图像也 Tokenize 了。这个我们在后续文章里展开。</p>
+
+            <!-- ========== 6、常见误区 ========== -->
+            <h2 id="shizhan">六、常见误区（翻车现场）</h2>
+
+            <h3>误区一：Token ≈ 字数</h3>
+            <p><strong>翻车现场</strong>：以为 100K Context Window 能塞 10 万字，结果 3 万字就满了。</p>
+            <p><strong>真相</strong>：1 个中文字符 ≈ 1~2 个 Token；1 个英文单词 ≈ 1~1.5 个 Token；1 行代码 ≈ 数量完全取决于缩进和特殊符号。</p>
+
+            <h3>误区二：Token ≈ 单词</h3>
+            <p><strong>翻车现场</strong>：以为"100 个单词 = 100 个 Token"，结果模型报 Token 超限。</p>
+            <p><strong>真相</strong>：高频单词如 "the" 是一个 Token，"university" 可能是两个 Token（"univer" + "sity"），"internationalization" 可能是三个。更别提 URL 和代码了。</p>
+
+            <h3>误区三：减少字符就能减少 Token</h3>
+            <p><strong>翻车现场</strong>：为了省钱把 Prompt 里的英文全部缩写——"you" 改成 "u"、"thanks" 改成 "thx"——结果 Token 数几乎没变，反而让模型理解变差了。</p>
+            <p><strong>真相</strong>：Tokenizer 是按训练数据里的高频组合来切的，不是按字符数。缩写可能恰好跟你省掉的那个高频组合一样大。</p>
+
+            <h3>误区四：不同模型的 Tokenizer 差不多</h3>
+            <p><strong>翻车现场</strong>：同一段 Prompt，GPT-4 报 500 Token，Claude 报 450 Token，换了 Gemini 变成 600。到底以哪个为准？</p>
+            <p><strong>真相</strong>：每个模型的 Tokenizer 是独立训练的，词表大小、合并策略都不一样。GPT 的 Tokenizer 理解不了 Claude 的 Token，反过来也一样。跨模型迁移 Prompt 时，Token 数是评估成本的基础。</p>
+
+            <h3>误区五：Tokenizer 理解语言</h3>
+            <p><strong>翻车现场</strong>：以为 Tokenizer 懂得"run"和"running"是同一个词的不同形态，会把它们切成相似的 Token。</p>
+            <p><strong>真相</strong>：Tokenizer 不懂语法。<strong>真正理解语言的是 Transformer</strong>——它通过注意力机制学会"running"和"walking"都跟"动作"有关。Tokenizer 只负责切分，不负责理解。</p>
+            <blockquote>💡 <strong>Tokenizer 是分拣员，Transformer 才是质检员。别把前者的活派给后者，也别指望前者能干后者的活。</strong></blockquote>
+
+            <!-- ========== 7、总结 ========== -->
             <h2 id="jieyu">七、总结：语言属于人类，Token 属于模型</h2>
-            <p><strong>给小白的话</strong>：下次跟 AI 聊天成本高了、回答跑偏了，可能不是你表达不清，是你的文字在被模型接收的第一步就被"肢解"成了你完全没预料到的样子。</p>
-            <p><strong>给开发者的话</strong>：Tokenization 是在你写的每一行 Prompt、做的每一次上下文裁剪、算的每一笔 API 成本里反复出现的基础变量。</p>
-            <blockquote>💡 <strong>人类认为语言由字、词和句子组成。模型认为语言由 Token 组成。</strong></blockquote>
-            <p class="refs"><strong>参考资料</strong>：GPT Tokenizer Playground；Anthropic 官方文档《Token counting》</p>
+            <p><strong>给小白的话</strong>：下次跟 AI 聊天成本高了、回答跑偏了，别光怀疑 Prompt 写得不好——你写之前先了解一下，你打的每一个字，在模型"眼里"到底长什么样。可能不是你表达不清，是你的文字在被模型接收的第一步就被"肢解"成了你完全没预料到的样子。</p>
+            <p><strong>给开发者的话</strong>：Tokenization 不是"了解一下就行"的背景知识。它是在你写的每一行 Prompt、做的每一次上下文裁剪、算的每一笔 API 成本里反复出现的基础变量。Application 专题那六篇文章讲的所有手艺——精简要靠 Token 来度量，隔离要靠 Token 来预算，压缩要靠 Token 来验证——不搞清楚 Token 怎么来的，这些手艺只能算"背下来了"，不算"理解了"。</p>
+            <blockquote>💡 <strong>人类认为语言由字、词和句子组成。模型认为语言由 Token 组成。理解 Tokenization，就是理解语言第一次进入 AI 世界时发生了什么。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：GPT Tokenizer Playground；Anthropic 官方文档《Token counting》；Hugging Face Tokenizers 文档</p>
+
+            <!-- 跨文章导航：Foundation 专题第一篇，第二篇是 Embedding -->
             <nav class="article-nav">
                 <a href="embedding.html" class="nav-card nav-next">
                     <span class="nav-content">
@@ -113,9 +242,12 @@ LLM（把 Token ID 序列映射回文字，返回给你）</code></pre>
                     <span class="nav-arrow">→</span>
                 </a>
             </nav>
+
             <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
         </div>
     </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
@@ -127,6 +259,7 @@ LLM（把 Token ID 序列映射回文字，返回给你）</code></pre>
         });
     })();
     </script>
+
     <footer class="site-footer">
         <p>© 2026 · kipozannaki</p>
     </footer>
