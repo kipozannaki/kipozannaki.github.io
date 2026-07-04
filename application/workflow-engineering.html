@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Engineering 工业级落地 · kipozannaki</title>
+    <meta name="description" content="Workflow Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+        </nav>
+    </header>
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⚙️ Workflow Engineering 工业级落地</h1>
+            <p class="meta">从"步骤堆砌"到"可验收的协作系统" · 双栖科普</p>
+        </header>
+        <div class="article-body">
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#plan">Plan</a> · <a href="#spec">Spec</a> · <a href="#zuobiao">坐标</a> · <a href="#moshi">设计模式</a> · <a href="#zhuangtai">状态管理</a> · <a href="#cuowu">错误处理</a> · <a href="#kuangjia">框架对比</a> · <a href="#shizhan">实战案例</a> · <a href="#xunhuan">与 Loop 的衔接</a> · <a href="#jieyu">结语</a></p>
+            <h2 id="intro">一、引言：为什么 Workflow 不是"把几个步骤串起来"</h2>
+            <p>很多人对 Workflow 的理解停留在一张简单的流程图：<strong>步骤 A → 步骤 B → 步骤 C → 完成</strong>。结果上线后发现：步骤 B 的输出格式步骤 C 接不住、中间某步失败了不知道回退到哪、整个流程跑完了但结果根本不对。</p>
+            <p><strong>问题出在哪？</strong>这三个地方都可能：</p>
+            <ul>
+                <li><strong>Plan 没想清</strong>——步骤拆得太粗，一个步骤里塞了太多事；或者拆得太碎，步骤之间来回传数据，耦合得像 spaghetti</li>
+                <li><strong>Spec 没写明白</strong>——"步骤 B 处理数据"，处理成什么样算对？输出格式是什么？失败怎么办？没定义清楚，等于没定义</li>
+                <li><strong>状态没管好</strong>——步骤 A 改了全局变量，步骤 B 读了以为是对的，其实步骤 A 中途失败了没回滚，数据已经脏了</li>
+            </ul>
+            <p><strong>Workflow Engineering 干的事</strong>：从"怎么拆步骤"开始、经过"每一步的验收标准是什么"、"步骤之间怎么传数据"、"错了怎么回退"，设计一套<strong>从输入到输出的可验收协作系统</strong>。Workflow 不是一张流程图，而是一套有 Plan、有 Spec、有状态管理、有错误处理的工程规范。</p>
+            <blockquote>💡 <strong>Workflow 是"让多个步骤协作完成一件事"，但怎么拆、每一步做到什么程度算对、错了怎么修，每一步都需要设计。</strong></blockquote>
+            <h2 id="plan">二、Plan：步骤序列的"拓扑图"</h2>
+            <p>Plan 回答的是：<strong>这件事需要分几步？哪些步骤可以并行？步骤之间的依赖关系是什么？</strong></p>
+            <p>Plan 不是"怎么做"，而是<strong>"有哪些步骤、什么顺序、什么依赖关系"</strong>。</p>
+            <h3>2.1 拆步骤的原则</h3>
+            <p><strong>原则一：一个步骤只做一件事</strong></p>
+            <p>反例："审查代码并生成修复建议并提交 PR"——这是三件事。拆成三个步骤：审查 → 生成建议 → 提交 PR。</p>
+            <p><strong>原则二：步骤的边界由数据流决定</strong></p>
+            <p>什么时候该拆？看数据：如果步骤 A 的输出是步骤 B 的输入，且中间数据需要被验证，那就该拆。</p>
+            <p><strong>原则三：并行还是串行，看依赖不看直觉</strong></p>
+            <p>直觉上"先查数据再分析"是串行，但如果"查数据"可以拆成"查数据库"和"查缓存"两个独立操作，它们就可以并行。Plan 的关键是画出<strong>依赖图（DAG）</strong>，而不是时间线。</p>
+            <h3>2.2 Plan 的表示方式</h3>
+            <pre><code>Workflow: 代码审查自动化
+├── 步骤 1: 获取提交差异 (输入: commit SHA, 输出: diff)
+│   └── 依赖: 无
+├── 步骤 2: 静态分析 (输入: diff, 输出: 分析报告)
+│   └── 依赖: 步骤 1
+├── 步骤 3: 安全扫描 (输入: diff, 输出: 安全报告)
+│   └── 依赖: 步骤 1  (与步骤 2 并行)
+├── 步骤 4: 汇总结果 (输入: 分析报告 + 安全报告, 输出: 审查报告)
+│   └── 依赖: 步骤 2, 步骤 3
+└── 步骤 5: 提交评论 (输入: 审查报告, 输出: PR 评论)
+    └── 依赖: 步骤 4</code></pre>
+            <h2 id="spec">三、Spec：每个步骤的"验收标准"</h2>
+            <p>Spec 回答的是：<strong>这一步的输入是什么、输出是什么、算对了的标准是什么、错了怎么办。</strong></p>
+            <h3>3.1 整体 Workflow 的 Spec</h3>
+            <pre><code>【Workflow 整体 Spec】
+输入: GitHub 提交事件（commit SHA）
+输出: 审查报告（markdown）+ 是否允许合并（boolean）
+
+【整体验收标准】
+- 所有 3 个检查维度都必须完成（不能因为某个失败就跳过其他）
+- 报告必须在 10 分钟内生成
+- 如果有阻塞性问题，必须有"后续步骤"的建议
+
+【整体失败处理】
+- 某个检查超时 → 标记为"检查未完成"，不阻塞其他检查
+- 汇总阶段失败 → 回退到前一个 checkpoint，重新汇总
+- 整体超时 → 生成部分报告，标记为"超时中止"</code></pre>
+            <h3>3.2 单个步骤的 Spec 模板</h3>
+            <pre><code>步骤 4: 汇总结果
+
+【输入】
+- 分析报告（JSON，含问题列表和严重程度）
+- 安全报告（JSON，含漏洞列表和风险等级）
+
+【输出】
+- 审查报告（Markdown，含摘要、详细问题、修复建议）
+- 是否阻塞合并（boolean）
+
+【验收标准】
+- 报告必须包含"摘要"、"详细问题"、"修复建议"三个部分
+- 阻塞性问题的判定标准：严重程度为"critical"或安全等级为"high"
+- 报告长度不超过 2000 字
+
+【失败处理】
+- 输入格式不对 → 尝试解析，解析失败则标记为"输入异常"
+- 生成报告超时（> 2 分钟）→ 输出简化版报告，标记"部分生成"
+- 输出不符合 schema → 重新生成一次，仍失败则人工介入</code></pre>
+            <p>关键：<strong>Spec 必须可验证</strong>。"输出一份好报告"不是 Spec，"报告必须包含三个部分、不超过 2000 字"才是。</p>
+            <h2 id="zuobiao">四、Workflow 在工程体系里的坐标</h2>
+            <table>
+                <thead><tr><th>层级</th><th>管什么</th><th>与 Workflow 的关系</th></tr></thead>
+                <tbody>
+                    <tr><td>Prompt</td><td>单轮输入怎么写</td><td>Workflow 的每个步骤都需要 Prompt 来告诉模型干什么</td></tr>
+                    <tr><td>Context</td><td>单次会话里喂什么</td><td>Workflow 的状态可能很大，Context 负责只喂必要信息</td></tr>
+                    <tr><td>RAG</td><td>外部知识怎么接进来</td><td>Workflow 步骤可能需要调用 RAG</td></tr>
+                    <tr><td>Agent</td><td>单个自主实体</td><td>Workflow 的每个步骤通常是一个 Agent 或 Agent 的一次调用</td></tr>
+                    <tr><td>Skill</td><td>打包可复用能力</td><td>Workflow 可以把整个 Workflow 本身打包成一个 Skill</td></tr>
+                    <tr><td>Harness</td><td>单次 Agent 运行的环境</td><td>Workflow 的每个步骤运行在 Harness 中</td></tr>
+                    <tr><td>Loop</td><td>跨多次运行的调度</td><td>Loop 触发/管理 Workflow 实例</td></tr>
+                </tbody>
+            </table>
+            <h2 id="moshi">五、设计模式：不只是"步骤 A → 步骤 B"</h2>
+            <p><strong>不同场景应该选什么模式？用这个决策树</strong>：</p>
+            <pre><code>Workflow 需要在运行时根据结果动态改变路径？
+├─ 是 → 状态机（允许分支、条件跳转）
+└─ 否 ↓
+
+步骤之间有依赖？能否并行执行？
+├─ 完全线性、无法并行 → 线性链
+├─ 有部分分支可并行 → DAG
+└─ 完全独立、解耦为上 → 事件驱动</code></pre>
+            <h2 id="zhuangtai">六、状态管理：Workflow 的"记忆"</h2>
+            <p>Checkpoint 机制：在每个关键步骤完成后，保存当前状态，中断后从断点恢复。</p>
+            <h2 id="cuowu">七、错误处理：Workflow 的"安全气囊"</h2>
+            <table>
+                <thead><tr><th>失败类型</th><th>表现</th><th>策略</th></tr></thead>
+                <tbody>
+                    <tr><td>瞬时失败</td><td>API 超时、网络抖动</td><td>指数退避重试，最多 3 次</td></tr>
+                    <tr><td>逻辑失败</td><td>输出格式错、不符合 schema</td><td>fallback_chain：重试 → 换模型 → 人工</td></tr>
+                    <tr><td>不可恢复失败</td><td>权限不足、资源不存在</td><td>立即终止，报告错误</td></tr>
+                    <tr><td>依赖失败</td><td>上游步骤失败</td><td>关键依赖终止，可选依赖降级</td></tr>
+                    <tr><td>Workflow 级失败</td><td>状态损坏、超时、资源耗尽</td><td>Checkpoint 恢复 / Cleanup / 人工</td></tr>
+                </tbody>
+            </table>
+            <h2 id="kuangjia">八、主流方案对比</h2>
+            <div class="table-scroll">
+            <table>
+                <thead><tr><th>框架</th><th>核心特点</th><th>适用场景</th><th>缺点</th></tr></thead>
+                <tbody>
+                    <tr><td>LangGraph</td><td>与 LangChain 生态深度集成，图结构定义 Workflow</td><td>快速迭代、LLM 密集型 Workflow</td><td>不适合需要企业级可靠性的场景</td></tr>
+                    <tr><td>Temporal</td><td>企业级持久化、分布式执行、自动重试和补偿</td><td>长流程、关键业务、需要中断恢复</td><td>学习曲线陡、基础设施重</td></tr>
+                    <tr><td>LlamaIndex Workflows</td><td>面向 RAG 场景，与 LlamaIndex 生态集成</td><td>RAG 密集型、数据流复杂的 Workflow</td><td>新生态，社区沉淀少</td></tr>
+                    <tr><td>自研</td><td>完全可控，可定制审计日志、特殊权限管理</td><td>有强定制需求、已有成熟基础设施</td><td>维护成本高</td></tr>
+                </tbody>
+            </table>
+            </div>
+            <h2 id="jieyu">十二、结语：Workflow 是"协作"的基础</h2>
+            <p><strong>给小白的话</strong>：Workflow 就是"让多个步骤协作完成一件事"。但不是简单地把步骤串起来，而是要想清楚：这件事分几步、每步做什么、做到什么程度算对、错了怎么办。</p>
+            <p><strong>给开发者的话</strong>：Workflow 系统的性能瓶颈很少在"步骤执行有多快"，而在"步骤之间的数据流是否清晰、Spec 是否可验证、错了是否能恢复"。优化 Workflow 要从设计阶段开始——Plan 画清楚依赖图、Spec 写明白验收标准、状态管理选好持久化策略、错误处理分好层。</p>
+            <blockquote>💡 <strong>Workflow 不是万能药，但它是现代 AI 应用从"玩具"变成"工具"的关键。</strong></blockquote>
+            <p class="refs"><strong>参考资料</strong>：Temporal 官方文档、LangGraph 官方文档、AWS Step Functions 最佳实践</p>
+            <nav class="article-nav">
+                <a href="harness-engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🔧 Harness Engineering</span>
+                    </span>
+                </a>
+                <a href="loop-engineering.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🔁 Loop Engineering</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
