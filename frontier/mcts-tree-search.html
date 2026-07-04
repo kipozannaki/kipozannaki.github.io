@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCTS / Tree Search · kipozannaki</title>
-    <meta name="description" content="为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。">
+    <meta name="description" content="为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比&quot;多次采样投票&quot;更聪明地花算力。">
     <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
     <script>
     (function() {
@@ -35,7 +35,7 @@
     <article class="article-page">
         <header class="article-header">
             <h1>🌳 MCTS / Tree Search</h1>
-            <p class="meta">为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。</p>
+            <p class="meta">为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比&quot;多次采样投票&quot;更聪明地花算力。</p>
         </header>
         <div class="article-body">
 
@@ -60,13 +60,7 @@ Frontier：MCTS / Tree Search（怎么更聪明地花这些算力：有结构的
 Frontier：RLVR（下一篇：用客观可验证的正确性做训练信号）</code></pre>
             <p><strong>先划清一条边界</strong>：Test-Time Compute 那篇提到的多数投票、Best-of-N，本质是<strong>并行独立采样</strong>——每次生成互不参考，最后比较完整结果。MCTS 是<strong>有结构的、按步骤展开的搜索</strong>——在生成过程中就持续评估"这一步走得好不好"，并据此决定把算力投向哪个分支，两者的搜索方式本质不同。</p>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>相关概念</th>
-                        <th>跟 MCTS 的关系</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>相关概念</th><th>跟 MCTS 的关系</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td>Frontier · Test-Time Compute</td>
@@ -86,14 +80,7 @@ Frontier：RLVR（下一篇：用客观可验证的正确性做训练信号）</
             <h2 id="why">为什么不能只靠简单的多次独立采样？</h2>
             <p>上一篇提到的多数投票、Best-of-N，本质上是让模型独立生成好几份完整答案，再挑一个最好的。这种方式有一个明显的局限：</p>
             <table>
-                <thead>
-                    <tr>
-                        <th aria-hidden="true">　</th>
-                        <th>方案</th>
-                        <th>怎么做</th>
-                        <th>致命问题</th>
-                    </tr>
-                </thead>
+                <thead> <tr><th>方案</th><th>怎么做</th><th>致命问题</th></tr> </thead>
                 <tbody>
                     <tr>
                         <td>独立采样（多数投票 / Best-of-N）</td>
