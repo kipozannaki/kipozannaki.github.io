@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<!-- 文章页：RAG Engineering 工业级落地（新写，作为 Context Engineering 的上游供应链） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Engineering 工业级落地 · kipozannaki</title>
+    <meta name="description" content="RAG Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🔍 RAG Engineering 工业级落地</h1>
+            <p class="meta">从"把文档塞进向量库"到"完整的知识供应链" · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#liuliu">数据流</a> · <a href="#query">Query 理解</a> · <a href="#jiansu">检索</a> · <a href="#houchu">后处理</a> · <a href="#jiaoyan">答案校验</a> · <a href="#jinjie">进阶形态</a> · <a href="#shizhan">实战避坑</a> · <a href="#jieyu">结语</a></p>
+
+            <!-- ========== 一、引言 ========== -->
+            <h2 id="intro">一、引言：为什么 RAG 不是"把文档塞进向量库"</h2>
+            <p>很多人对 RAG 的理解停留在一个简单的流程图：<strong>用户问题 → 向量检索 → 注入 Prompt → 生成答案</strong>。结果上线后发现：检索回来的内容跟问题无关、上下文塞不下、模型还是瞎编。</p>
+            <p><strong>问题出在哪？</strong>这三个地方都可能：</p>
+            <ul>
+                <li>问题本身就没问对——用户说"这个怎么用"，系统却去检索"使用场景介绍"，答非所问</li>
+                <li>检索方案选错了——用专有名词查询却用纯向量检索，结果命中 90% 相似但版本完全不对的文档</li>
+                <li>塞进去的方式不对——10 段检索结果全塞进去，不仅爆了 token 还让模型分不清哪个重要</li>
+            </ul>
+            <p><strong>RAG Engineering 干的事</strong>：从"问题理解"开始、经过"检索优化"、"结果后处理"、"答案校验"，设计一条从<strong>用户问题到模型答案的完整数据流</strong>。RAG 不是一个技术细节，而是一套系统工程。</p>
+            <blockquote>💡 <strong>RAG 是"让 AI 在回答之前，先去翻一下资料"，但翻什么、怎么翻、翻回来怎么用，每一步都需要设计。</strong></blockquote>
+
+            <!-- ========== 二、坐标 ========== -->
+            <h2 id="zuobiao">二、RAG 在工程体系里的坐标</h2>
+            <p>这是关键的定位澄清：RAG 不是和 Context Engineering 平级，而是<strong>Context Engineering 的上游供应链</strong>。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Prompt Engineering</th>
+                        <th>Context Engineering</th>
+                        <th>RAG Engineering</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>管什么</td>
+                        <td>单轮输入怎么写</td>
+                        <td>单次会话里喂什么</td>
+                        <td>窗口里那些东西从哪来</td>
+                    </tr>
+                    <tr>
+                        <td>数据流</td>
+                        <td>内向（用户输入）</td>
+                        <td>流向（怎么组织）</td>
+                        <td>来源（外部知识）</td>
+                    </tr>
+                    <tr>
+                        <td>依赖关系</td>
+                        <td>独立</td>
+                        <td>依赖 Prompt 格式</td>
+                        <td>为 Context 供给数据</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>换句话说：</p>
+            <ul>
+                <li><strong>没有 RAG</strong>：Context 只能靠 Prompt 里的硬编码知识，外部信息无法实时获取</li>
+                <li><strong>有了 RAG</strong>：Context 可以动态地从知识库补充实时信息，模型回答的准确性和时效性都提升</li>
+            </ul>
+            <p>RAG 和本站其他概念的关系：</p>
+            <ul>
+                <li><strong>× Prompt Engineering</strong>　RAG 检索结果最终要变成 Prompt 的一部分，所以检索结果的格式和表述方式要配合 Prompt 的结构</li>
+                <li><strong>× Context Engineering</strong>　RAG 决定"这些知识从哪捞"，Context 决定"把它怎么摆进窗口"——两者协作</li>
+                <li><strong>× Agent</strong>　Agent 可以自主决定"要不要查 RAG、什么时候查、查哪个知识库"，把 RAG 当成一个工具来用</li>
+                <li><strong>× Loop Engineering</strong>　Loop 层可以定期刷新 RAG 的知识库，保证外部知识保持最新</li>
+            </ul>
+
+            <!-- ========== 三、数据流拆解 ========== -->
+            <h2 id="liuliu">三、从 Query 到 Answer：RAG 的完整数据流</h2>
+            <pre><code>用户问题
+   │
+   ▼
+[1. Query 理解] ──→ 意图识别、问题改写、多跳拆解
+   │
+   ▼
+[2. 检索] ──→ 向量检索、关键词检索、混合检索、重排序
+   │
+   ▼
+[3. 后处理] ──→ 去重、截断、格式化、相关性过滤
+   │
+   ▼
+[4. 注入 Context] ──→ 塞进 Prompt 的指定位置
+   │
+   ▼
+[5. 生成] ──→ 模型基于"问题 + 检索结果"生成答案
+   │
+   ▼
+[6. 答案校验] ──→ 幻觉检测、来源溯源、置信度评估</code></pre>
+
+            <!-- ========== 四、Query 理解 ========== -->
+            <h2 id="query">四、Query 理解：问题本身往往问不对</h2>
+
+            <h3>4.1 意图识别与澄清（Intent Clarification）</h3>
+            <p>用户问题往往有歧义。比如"给我一份 React 教程"，可能指：</p>
+            <ul>
+                <li>从零开始学（想要基础教程）</li>
+                <li>快速上手（想要进阶教程）</li>
+                <li>查 API 文档（想要参考资料）</li>
+            </ul>
+            <p>RAG 系统无法从单句话推断意图。处理方式：</p>
+            <ul>
+                <li><strong>利用对话历史</strong>：如果这是多轮对话，前面的交互可能透露了用户的知识水平</li>
+                <li><strong>靠检索结果反推</strong>：检索 Top-5 结果差异很大，说明意图不清；如果很一致，说明问题表述清楚</li>
+                <li><strong>主动澄清</strong>：生成几个可能的意图，让用户选择（这在实战中很常见）</li>
+            </ul>
+            <blockquote>关键决策：是否为了 10% 的准确性提升而麻烦用户做一次选择？还是直接用最可能的意图进行检索？通常答案是"用 Top-3 意图的检索结果求并集"——兼顾覆盖面和成本。</blockquote>
+
+            <h3>4.2 问题改写（Query Rewriting）</h3>
+            <p>用户的原始问题很少是"检索友好"的。</p>
+            <p><strong>原始问题和改写后的对比</strong>：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>原始问题</th>
+                        <th>改写后</th>
+                        <th>为什么要改</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>"这个怎么用？"</td>
+                        <td>"React useEffect 的依赖数组怎么填？"</td>
+                        <td>前者太模糊，要靠对话历史补全</td>
+                    </tr>
+                    <tr>
+                        <td>"为什么报错？"</td>
+                        <td>"TypeError: Cannot read properties of undefined 的常见原因和解决方案"</td>
+                        <td>用具体错误信息替代模糊的"报错"</td>
+                    </tr>
+                    <tr>
+                        <td>"对比一下 A 和 B"</td>
+                        <td>拆解为两个独立查询 + 汇总指令</td>
+                        <td>比较类问题需要分别检索再合并</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>技术方案：用 LLM 自动改写。Anthropic 的"HyDE"（Hypothetical Document Embedding）思路值得参考：让模型先写一个"理想答案"，然后用这个答案的 Embedding 去检索。</p>
+
+            <h3>4.3 多跳拆解（Multi-hop Decomposition）</h3>
+            <p>复杂问题需要拆成多个子查询，分别检索后汇总。</p>
+            <p><strong>示例</strong>："2024 年 Q3 营收增长最快的 SaaS 公司，它的 CEO 之前在哪工作？"</p>
+            <pre><code>查询 1: "2024 Q3 SaaS 公司营收增长率排名"
+  结果: 公司 X 增长最快
+
+查询 2: "公司 X CEO 履历和工作经历"
+  结果: CEO 曾在 Y 公司任 CTO</code></pre>
+            <p>关键：子查询之间存在依赖关系，不是并行检索能搞定的，需要 Workflow 或 Agent 层来编排。</p>
+
+            <!-- ========== 五、检索 ========== -->
+            <h2 id="jiansu">五、检索：不只是向量相似度</h2>
+
+            <h3>5.1 向量检索（Dense Retrieval）</h3>
+            <ul>
+                <li><strong>Embedding 模型选择</strong>：OpenAI text-embedding-3-large、BGE、E5——不是越大越好，要看领域匹配度。中文技术文档用 BGE-large-zh 往往比通用模型效果更好</li>
+                <li><strong>Chunk 策略</strong>：按段落切、按固定 token 数切、按语义切——各有利弊。技术文档通常按标题层级切，chunk 大小 512，重叠 128</li>
+                <li><strong>陷阱</strong>：向量相似度 ≠ 语义相关。两个句子 Embedding 很近，但可能回答的是完全不同的问题</li>
+            </ul>
+
+            <h3>5.2 关键词检索（Sparse Retrieval）</h3>
+            <p>BM25、TF-IDF 在这些场景下往往比向量检索更准：</p>
+            <ul>
+                <li>精确匹配（查询"Python 3.12 的 PEP 695"，BM25 能精确命中，向量可能把 3.11 版本也排前面）</li>
+                <li>专有名词（人名、产品名、版本号）</li>
+                <li>数字和代码片段</li>
+            </ul>
+
+            <h3>5.3 检索方案的决策框架</h3>
+            <p><strong>不同场景应该选什么检索方案？用这个决策树</strong>：</p>
+            <pre><code>査询包含专有名词 / 数字 / 版本号？
+├─ 是 → 混合检索（向量 + BM25）优于纯向量
+└─ 否 → 纯向量检索通常够用
+
+知识库大小？
+├─ < 10K 文档 → 纯向量检索就行
+├─ 10K-100K → 考虑混合检索
+└─ > 100K → 混合 + 重排序（成本考虑）
+
+能接受的推理延迟？
+├─ 秒级响应 → 向量检索 + 轻量重排序
+└─ 可容忍几秒 → 混合检索 + 重量级重排序</code></pre>
+
+            <h3>5.4 混合检索与重排序</h3>
+            <p><strong>混合检索</strong>：向量 + 关键词，结果融合。常见策略：</p>
+            <ul>
+                <li><strong>RRF（Reciprocal Rank Fusion）</strong>：按排名加权，不依赖绝对分数。推荐新手用这个，最稳健</li>
+                <li><strong>线性加权</strong>：dense_score * α + sparse_score * (1-α)，α 需调优</li>
+            </ul>
+            <p><strong>重排序</strong>：初筛召回 100 条，用更重的模型（cross-encoder）精排 top-10。权衡：慢、贵，但准确率提升显著。生产环境通常"轻量检索召回多 + 重排序精排少"。</p>
+
+            <!-- ========== 六、后处理 ========== -->
+            <h2 id="houchu">六、后处理：检索回来不等于能用</h2>
+
+            <h3>6.1 去重与冗余消除</h3>
+            <p>向量检索可能召回语义相近的多段内容，需要合并或去重。方法：聚类（如 HDBSCAN）+ 代表性片段选取。</p>
+
+            <h3>6.2 截断与优先级</h3>
+            <p>上下文窗口有限，检索回来 10 段内容可能只能塞 3 段。策略：</p>
+            <ul>
+                <li>按重排序分数截断（最简单）</li>
+                <li>按信息类型分层（必含段 + 补充段）</li>
+                <li>动态调整：简单问题少塞，复杂问题多塞</li>
+            </ul>
+
+            <h3>6.3 注入格式：因问题复杂度而异</h3>
+            <p><strong>简单问题的统一格式</strong>：</p>
+            <pre><code>&lt;documents&gt;
+[1] 来源: xxx.md | 置信度: 0.92
+内容: ...
+
+[2] 来源: yyy.md | 置信度: 0.88
+内容: ...
+&lt;/documents&gt;
+
+&lt;instruction&gt;
+基于以上文档回答问题。如果文档中没有相关信息，明确说"我不知道"。
+&lt;/instruction&gt;</code></pre>
+            <p><strong>复杂问题的分层注入</strong>：</p>
+            <pre><code>&lt;primary_documents&gt;  // 关键信息，必须有
+...
+&lt;/primary_documents&gt;
+&lt;supporting_documents&gt;  // 辅助信息
+...
+&lt;/supporting_documents&gt;</code></pre>
+            <p><strong>多跳问题的链式注入</strong>：</p>
+            <pre><code>&lt;retrieved_documents step="1"&gt;
+查询: "X 公司 2024 Q3 营收"
+结果: ...
+&lt;/retrieved_documents&gt;
+&lt;retrieved_documents step="2"&gt;
+查询: "X 公司 CEO 履历"
+结果: ...
+&lt;/retrieved_documents&gt;</code></pre>
+            <p>关键决策：问题的复杂度 → 选择相应的注入模式。每段内容都要标来源，方便后续溯源和幻觉检测。</p>
+
+            <!-- ========== 七、答案校验 ========== -->
+            <h2 id="jiaoyan">七、答案校验：RAG 不是万能药</h2>
+
+            <h3>7.1 幻觉检测</h3>
+            <p>模型可能"脑补"检索结果里没有的信息。检测方法：</p>
+            <ul>
+                <li><strong>忠实度评分</strong>：用 NLI（自然语言推理）模型判断答案是否被检索内容支撑</li>
+                <li><strong>溯源检查</strong>：答案中的每个事实，能否追溯到某段检索内容的明确出处？</li>
+            </ul>
+
+            <h3>7.2 来源溯源</h3>
+            <p>用户问"这个结论从哪来的"，系统需要能指出具体文档和段落。实现：检索阶段保留文档 ID + 段落偏移，生成阶段做 attribution 标记。</p>
+
+            <h3>7.3 置信度评估与降级策略</h3>
+            <p>检索结果质量和模型的"信心"往往不一样。即使检索结果充分，模型也可能"拒不承认"某个结论；反过来，模型也可能对一个只由单一来源支撑的结论过度自信。</p>
+            <p><strong>置信度评估方法</strong>：</p>
+            <ul>
+                <li><strong>自信度打分</strong>：让模型自己评估"我对这个答案有多确信"（0-1）</li>
+                <li><strong>检索覆盖度</strong>：回答中涉及 N 个事实点，其中有多少被检索结果覆盖？覆盖度 = 被支撑的事实数 / 总事实数</li>
+                <li><strong>来源多样性</strong>：是否来自单一文档还是多个独立来源？</li>
+            </ul>
+            <p><strong>根据置信度采取不同策略</strong>：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>置信度</th>
+                        <th>表现</th>
+                        <th>策略</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>高（> 0.8）</td>
+                        <td>检索结果充分支撑答案</td>
+                        <td>直接回答</td>
+                    </tr>
+                    <tr>
+                        <td>中（0.5-0.8）</td>
+                        <td>检索结果部分相关，覆盖度 60-80%</td>
+                        <td>回答 + 免责声明"基于有限信息"</td>
+                    </tr>
+                    <tr>
+                        <td>低（< 0.5）</td>
+                        <td>检索结果不相关或为空，覆盖度 < 60%</td>
+                        <td>明确说"我不确定"，提议扩大检索范围</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>降级方案</strong>（当置信度低时）：</p>
+            <ul>
+                <li>扩大检索范围（Top-100 而不是 Top-10）</li>
+                <li>切换 Embedding 模型（有时换一个模型效果差异很大）</li>
+                <li>触发多跳检索（如果是多跳问题但当前只做了单跳）</li>
+                <li>交给人工审核（关键决策类答案）</li>
+            </ul>
+
+            <!-- ========== 八、进阶：三种演进形态 ========== -->
+            <h2 id="jinjie">八、进阶：RAG 的三种演进形态</h2>
+
+            <h3>8.1 Naive RAG</h3>
+            <p>单次检索 → 单次生成。最简单，也是大多数系统的现状。</p>
+
+            <h3>8.2 Advanced RAG</h3>
+            <p>在 Naive RAG 基础上加优化：</p>
+            <ul>
+                <li>查询改写、多跳拆解（Query 层）</li>
+                <li>混合检索 + 重排序（检索层）</li>
+                <li>后处理去重、分层注入（后处理层）</li>
+                <li>置信度评估、降级策略（校验层）</li>
+            </ul>
+            <p>这一篇讲的内容，基本就是 Advanced RAG 的完整体系。</p>
+
+            <h3>8.3 Agentic RAG</h3>
+            <p>Agent 自主决定"要不要检索、检索什么、检索几次、检索结果够不够用"。和 agent.html 讲的 Agent 概念直接对接：Agent 可以把 RAG 当成一个工具来用，也可以把 RAG 的"检索-评估-再检索"封装成自主决策循环。</p>
+
+            <!-- ========== 九、实战避坑 ========== -->
+            <h2 id="shizhan">九、实战避坑：真实项目中最常见的坑</h2>
+
+            <h3>坑一：文档更新后 Embedding 没同步，检索到的是过期信息</h3>
+            <p><strong>翻车现场</strong>：知识库一个月前的文档被索引了，现在文档改了，但索引没更新。用户问最新的信息，系统返回的是一个月前的回答。</p>
+            <p><strong>根因</strong>：把 RAG 当成"一次索引、永久有效"的系统。</p>
+            <p><strong>解决方案</strong>：</p>
+            <ul>
+                <li>给文档加版本和更新时间戳</li>
+                <li>监听文档变更（webhook 或定期扫描），变更后自动增量更新索引</li>
+                <li>定期清理过期文档（超过 X 天没更新的，或被标记为废弃的）</li>
+                <li>这也是 Loop Engineering 要处理的问题：Loop 可以定期刷新 RAG 的知识库，但 RAG 层需要提供"哪些文档需要更新"的反馈机制</li>
+            </ul>
+            <blockquote>💡 <strong>RAG 不是"一次部署就完事"，需要持续的知识库维护。</strong></blockquote>
+
+            <h3>坑二：Chunk 切太碎，跨段落的上下文丢失</h3>
+            <p><strong>翻车现场</strong>：一个技术概念分散在文档的不同段落，每个 chunk 都被独立索引和检索，模型拿到的是几个碎片化的片段，无法理解整体意思。</p>
+            <p><strong>根因</strong>：机械地按 token 数截断。</p>
+            <p><strong>解决方案</strong>：按文档结构切。技术文档按标题层级切，保留层级关系；通用文本可以按段落或语义单元切。</p>
+
+            <h3>坑三：用户问题太模糊，检索结果散乱无法汇总</h3>
+            <p><strong>翻车现场</strong>：用户问"给我讲讲这个框架"，系统检索到了安装指南、API 参考、最佳实践三种完全不同的文档，模型试图把它们揉在一起，结果四不像。</p>
+            <p><strong>根因</strong>：没有做意图澄清或问题改写。</p>
+            <p><strong>解决方案</strong>：加一层问题理解。对模糊问题，要么让用户澄清、要么靠对话历史补全、要么用多个改写版本的检索结果求并集。</p>
+
+            <!-- ========== 十、结语 ========== -->
+            <h2 id="jieyu">十、结语：RAG 是"知道得更准"的基础</h2>
+            <p><strong>给小白的话</strong>：RAG 就是"让 AI 在回答之前，先去翻一下资料"。但翻什么、怎么翻、翻回来怎么用，每一步都需要设计。好的 RAG 系统和坏的 RAG 系统的区别，不在"有没有向量库"，而在"问题理解得清不清、检索结果对不对、注入方式是否合理"这一系列细节上。</p>
+            <p><strong>给开发者的话</strong>：RAG 系统的性能瓶颈很少在"向量检索有多快"，而在"检索回来的东西对不对、够不够、模型有没有用上"。优化 RAG 要从数据流的全链路看——从 Query 理解开始、经过检索方案选择、后处理优化、答案校验——每一层都是优化空间。光调 Embedding 模型是没用的。</p>
+            <p><strong>系列衔接</strong>：RAG 把外部知识接进了 Context，Context Engineering 决定这些知识在窗口里怎么摆，Prompt Engineering 决定怎么告诉模型"基于这些知识回答"。三层协作，才能让模型真正用上外部知识。而 Loop Engineering 在背后确保知识库保持最新，Agent 在上层自主决定要不要用 RAG、什么时候用。</p>
+            <blockquote>💡 <strong>RAG 不是万能药，但它是现代 AI 应用的标配。一旦系统涉及外部知识，RAG 层的设计质量往往决定了整体系统的天花板。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Anthropic 官方文档《RAG best practices》及向量检索相关研究文献</p>
+
+            <nav class="article-nav">
+                <a href="context-engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🧭 Context Engineering</span>
+                    </span>
+                </a>
+                <a href="skill.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🛠️ Skill</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
