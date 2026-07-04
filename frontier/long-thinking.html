@@ -55,61 +55,15 @@
             <p>💡 <strong>ong Thinking 不是让模型从"快思考"变成"慢思考"，而是让模型学会"该快时快、该慢时慢"——但 2026 年的现实是，大多数模型还停在"要么不想、要么想太多"的两极。</strong></p>
             <hr>
             <h2 id="zuobiao">坐标：Long Thinking 在 Agent 管线里的位置</h2>
-            <h3>1.1 代码块流程图</h3>
-            <pre><code>┌─────────────────────────────────────────────────────────────┐
-│                    用户请求层 (User Request)                  │
-│              "分析这份量子计算论文的核心创新点"                │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              推理深度控制器 (Reasoning Depth Controller)        │
-│         ┌─────────────┐    ┌─────────────┐                 │
-│         │  问题难度评估  │───▶│  Thinking   │                 │
-│         │  (heuristic/  │    │  Budget     │                 │
-│         │   classifier) │    │  分配        │                 │
-│         └─────────────┘    └─────────────┘                 │
-│                              │                              │
-│              ┌───────────────┼───────────────┐              │
-│              ▼               ▼               ▼              │
-│         ┌────────┐    ┌──────────┐    ┌──────────┐       │
-│         │Instant │    │ Thinking │    │   Pro    │       │
-│         │(1-3秒) │    │(5-30秒)  │    │(30s-数分钟)│       │
-│         │低预算  │    │ 中等预算  │    │ 高预算     │       │
-│         └────┬───┘    └────┬─────┘    └────┬─────┘       │
-└──────────────┼─────────────┼───────────────┼─────────────┘
-               │             │               │
-               ▼             ▼               ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Long Thinking 引擎层                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              长思考链生成 (Long CoT Generation)        │   │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌────────┐ │   │
-│  │  │ 问题理解 │─▶│ 方法探索 │─▶│ 自我验证 │─▶│ 回溯修正 │ │   │
-│  │  └─────────┘  └─────────┘  └─────────┘  └────────┘ │   │
-│  │       │            │            │            │       │   │
-│  │       └────────────┴────────────┴────────────┘       │   │
-│  │                      │                              │   │
-│  │                      ▼                              │   │
-│  │              ┌─────────────────┐                     │   │
-│  │              │  Dynamic Early  │                     │   │
-│  │              │     Exit        │──▶ 足够确定？→ 输出   │   │
-│  │              │  (提前停止)      │     不确定？→ 继续探索 │   │
-│  │              └─────────────────┘                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              输出层                                           │
-│         ┌─────────────┐    ┌─────────────┐                 │
-│         │  Final Answer│    │ Thinking    │                 │
-│         │  (最终答案)  │    │ Trace       │                 │
-│         │              │    │ (思考过程)   │                 │
-│         │  受安全过滤   │    │  需同等审查  │                 │
-│         └─────────────┘    └─────────────┘                 │
-└─────────────────────────────────────────────────────────────┘</code></pre>
-            <h3>1.2 关系表：Long Thinking 与周边概念</h3>
+            <p>带推理深度控制的请求流转长这样：</p>
+            <pre><code>用户请求层 (User Request)
+    ↓
+推理深度控制器 (Reasoning Depth Controller)
+    ↓
+Long Thinking 引擎层  ← 本篇
+    ↓
+输出层</code></pre>
+            <p>Long Thinking 与周边概念的关系：</p>
             <table>
                 <thead> <tr><th>概念</th><th>与 Long Thinking 的关系</th><th>一句话区分</th></tr> </thead>
                 <tbody>
@@ -227,7 +181,7 @@
                 <li><strong>DeepSeek-V4-Pro</strong>：dual think mode，单模型内切换，不需要调用不同 endpoint。</li>
             </ul>
             <p><strong>效果</strong>：减少部署复杂度（一个模型覆盖所有场景），避免"模式切换"的延迟和错误。</p>
-            <h4>实现三：RLVR 训练长思考能力</h4>
+            <p>#### 实现三：RLVR 训练长思考能力</p>
             <p><strong>直觉</strong>：像教小孩下棋。不是告诉他"每一步怎么走"（SFT），而是让他自己下，赢了给糖、输了给巴掌（RL），最终他自己悟出"需要多想几步"的策略。</p>
             <p><strong>具体</strong>：</p>
             <ul>
@@ -427,7 +381,16 @@
                 <li>"Chain of draft: thinking faster by writing less" (arXiv, 2025)</li>
                 <li>Qwen3 Technical Report (arXiv, 2025) — native thinking-mode with adaptive budget</li>
                 <li>OLMo 3 Technical Report (arXiv, 2025) — Thinking SFT → DPO → RLVR pipeline</li>
+                <li>DAPO: An Open-Source LLM Reinforcement Learning System at Scale (arXiv, 2025)</li>
+                <li>VAPO: Value-model-based RL with length-adaptive GAE (arXiv, 2025)</li>
+                <li>Kimi k1.5: Long-context RL with policy optimization (2025)</li>
+                <li>rStar-Math: Small LMs bootstrap reasoning via MCTS rollouts (2025)</li>
+                <li>AI Crucible: Thinking Models of 2026 — Deep Reasoning Compared (2026)</li>
+                <li>TeamAI: Best AI Models for Complex Reasoning Compared (2026)</li>
+                <li>OpenReview: Qwen3 training details (2026) — four-stage post-training with thinking mode fusion</li>
             </ul>
+            <h3>下一篇预告</h3>
+            <p><strong>骗你的还没想好写什么（笑）</strong></p>
 
             <nav class="article-nav">
                 <a href="mcp-evolution.html" class="nav-card nav-prev">
@@ -439,8 +402,8 @@
                 </a>
                 <a href="frontier.html" class="nav-card nav-next">
                     <span class="nav-content">
-                        <span class="nav-label">返回专题</span>
-                        <span class="nav-title">🌌 Frontier 全部文章</span>
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">返回 Frontier 专题</span>
                     </span>
                     <span class="nav-arrow">→</span>
                 </a>
