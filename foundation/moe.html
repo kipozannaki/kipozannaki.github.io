@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- 文章页：MoE — Foundation & Core Algorithms 专题第七篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoE · kipozannaki</title>
+    <meta name="description" content="为什么「参数量」突然要拆成两个数字讲？为什么 MoE 模型说「只用了一部分参数」，显存却照样爆？一篇讲清混合专家模型到底在省什么。">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="foundation.html">Foundation</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧩 MoE：参数量这个数字，什么时候开始不老实了？</h1>
+            <p class="meta">为什么两个「参数量相同」的模型推理成本能差好几倍？一篇讲清混合专家模型到底在省什么 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能直接把模型做大</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <!-- ========== 0、引言 ========== -->
+            <h2 id="intro">零、引言：「XX 亿参数」这句话，最近开始需要打个问号</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么现在越来越多模型介绍自己时要报两个数字——「总参数量 XX 亿，激活参数量 XX 亿」，参数量什么时候开始要分着讲了？</li>
+                <li>为什么两个号称参数量相当的模型，实际跑起来推理速度和成本能差好几倍？</li>
+                <li>为什么一个 MoE 模型说自己「每次只用一部分参数」，实际部署时显存需求却几乎没有省多少？</li>
+                <li>为什么训练 MoE 模型的时候，会出现「某几个专家累死、其他专家几乎没干过活」这种怪现象？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>MoE（Mixture of Experts，混合专家模型）</strong>这个架构变体里。上一篇 Inference 讲的是「一个标准模型该怎么跑」，本篇要讲的，是一种从架构层面改变了「跑起来到底要花多少算力」这个前提的设计。</p>
+            <blockquote>💡 <strong>稠密模型是「每次考试，全体员工都上场」；MoE 是「每次考试，只喊相关的几个专家出来答题，其他人待命」——总人数没变，但每次真正干活的人数变了。</strong></blockquote>
+
+            <!-- ========== 1、坐标 ========== -->
+            <h2 id="zuobiao">一、MoE 在 AI 世界里的坐标</h2>
+            <p>MoE 本质上是对 Transformer 内部结构的一处改造，不是一套全新的管线，而是在原有骨架上换了一个零件：</p>
+            <pre><code>Tokenizer → Embedding → Attention / Transformer
+    ↓
+其中的前馈网络（FFN）层，被替换成 MoE 结构：
+    Router（路由器，决定每个 Token 该找哪几个专家） → 若干 Expert（专家子网络，只有被选中的才参与计算）  ← 本篇
+    ↓
+Pretraining（训练时要额外处理专家负载均衡）→ Alignment → Inference</code></pre>
+            <p>这一处改造的影响会渗透到工程体系里：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工程概念</th>
+                        <th>跟 MoE 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Inference（上一篇）</td><td>上一篇讲「标准模型怎么跑」，MoE 改变的正是推理成本和参数量之间的对应关系——这也是本篇要讲的核心</td></tr>
+                    <tr><td>Topic③ 推理优化</td><td>MoE 给推理系统的批处理调度、专家并行部署带来了新的工程挑战，具体怎么解决留给 Topic③ 细讲</td></tr>
+                    <tr><td>Pretraining</td><td>MoE 训练要额外加入「负载均衡」的约束，这是标准稠密模型训练不需要特别处理的复杂度</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>MoE 改变的不是模型「知道多少」，是模型「每次回答问题，要动用多少人手」——这直接决定了你的账单和延迟。</strong></blockquote>
+
+            <!-- ========== 2、为什么不能直接把模型做大 ========== -->
+            <h2 id="why">二、为什么不能直接把模型做得更大？</h2>
+            <p>稠密（Dense）模型——也就是前几篇默认讨论的那种标准架构——有一个朴素但代价高昂的特点：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>稠密模型直接堆参数</td>
+                        <td>每处理一个 Token，都要激活全部参数参与计算</td>
+                        <td>想要更强的能力就得堆更多参数，但计算成本和显存开销会跟着参数量同步增长——每一个 Token，不管难易，都要让「全体员工」陪着算一遍</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一个自然的问题是：能不能让模型的「总知识容量」做得很大，但每次真正参与计算的只是其中一小部分？MoE 就是这个问题的答案——<strong>把原本「人人必经」的前馈网络层，换成多个并行的专家子网络，每个 Token 只激活其中一小部分专家参与计算</strong>。</p>
+            <blockquote>💡 <strong>不是让每个员工都变得更博学，是雇了很多个专精不同方向的员工，每次只喊相关的那几个出来干活。</strong></blockquote>
+
+            <!-- ========== 3、怎么工作的 ========== -->
+            <h2 id="how">三、MoE 到底是怎么工作的？</h2>
+            <p>MoE 在 Transformer 的前馈网络（FFN）层做了两处改动：</p>
+            <p><strong>多个专家（Expert）</strong>：原本一个统一的 FFN 子网络，被替换成多个结构相同、但参数各自独立训练的子网络，称为「专家」。</p>
+            <p><strong>路由器（Router）</strong>：新增一个小组件，对每一个 Token，动态判断应该交给哪几个专家处理——常见做法是「Top-K 路由」，比如从 8 个专家里挑出最相关的 2 个，只有这 2 个专家会为这个 Token 做计算，其余 6 个专家对这个 Token 完全不参与运算。</p>
+            <p>这样一来，模型出现了两个不同的「参数量」概念：</p>
+            <ul>
+                <li><strong>总参数量</strong>：所有专家的参数加在一起的总量，决定了模型能存下多少知识，也决定了部署时显存/存储要预留多大空间。</li>
+                <li><strong>激活参数量</strong>：处理某个 Token 时实际参与计算的参数量（只算被路由选中的那几个专家），决定了这个 Token 实际要花多少算力去处理。</li>
+            </ul>
+            <p>这也是为什么现在介绍 MoE 模型时，经常要同时报「总参数量」和「激活参数量」两个数字——它们分别对应两种完全不同的资源开销。</p>
+            <blockquote>💡 <strong>总参数量回答「这个模型的脑子有多大」，激活参数量回答「回答这一句话，它动了多少脑细胞」——两个数字问的是不同的问题。</strong></blockquote>
+
+            <!-- ========== 4、怎么影响能力 ========== -->
+            <h2 id="impact">四、MoE 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+
+            <h3>为什么「参数量」这个数字开始变得让人误判？</h3>
+            <p><strong>翻车现场</strong>：看到一个 MoE 模型标榜「XX 亿参数」，以为它的推理成本应该和同样标着「XX 亿参数」的稠密模型差不多，实际跑起来速度却快出不少，成本也低出一截。</p>
+            <p><strong>根因</strong>：MoE 的「总参数量」和稠密模型的参数量，根本不是同一类数字——稠密模型的参数量本身就等于它的计算量参照，而 MoE 的总参数量只反映知识容量，真正决定计算成本的是激活参数量，两者常常差出好几倍。单看「总参数量」去类比推理速度和成本，得出的结论会是错的。</p>
+
+            <h3>为什么「只用了一部分参数」，显存却照样爆？</h3>
+            <p><strong>翻车现场</strong>：一个 MoE 模型每个 Token 只激活 8 个专家里的 2 个，本以为显存需求应该比同等总参数量的稠密模型省不少，实际部署时发现显存占用几乎没怎么省。</p>
+            <p><strong>根因</strong>：虽然计算时只用一小部分专家，但<strong>所有专家的参数都必须常驻显存</strong>——因为不同的 Token 可能会被路由到不同的专家，系统没法提前预知这一批请求会用到哪几个专家，只能把全部专家都提前加载好。激活参数量省的是<strong>计算量</strong>，不是<strong>显存占用</strong>——这是一个非常容易被搞混，但对部署预算影响很大的区别。</p>
+
+            <h3>为什么训练时会出现「某几个专家累死、其他专家闲死」？</h3>
+            <p><strong>翻车现场</strong>：训练过程中发现，某几个专家被路由到的 Token 数量远超其他专家，这几个专家训练得又快又好，其他专家几乎没被充分训练，模型整体效果不均衡。</p>
+            <p><strong>根因</strong>：路由器本身是从数据里学出来的，如果不加干预，很容易收敛到「少数专家表现出色，大部分 Token 都被路由过去」这种局部最优解——这会导致其他专家训练不充分、整体专家利用率失衡。因此 MoE 训练通常要额外加入一个「负载均衡损失」（Auxiliary Loss），强制路由结果更均匀分布，这是标准稠密模型训练不需要特别处理的额外复杂度。</p>
+            <blockquote>💡 <strong>MoE 省下的是「算这道题需要多少人」，没有省「要请多少人待命」——这两笔账，一笔算的是电费，一笔算的是场地租金，不能混为一谈。</strong></blockquote>
+
+            <!-- ========== 5、为什么开发者要懂 ========== -->
+            <h2 id="engineering">五、为什么开发者一定要懂 MoE？</h2>
+            <p><strong>模型选型</strong>：别只看「参数量」这一个数字判断推理成本，要先分清对方报的是总参数量还是激活参数量——前者对应显存/存储成本，后者才对应推理速度和算力成本，混着比会得出错误的选型结论。</p>
+            <p><strong>Topic③ 推理优化</strong>：MoE 给推理系统的批处理调度、专家并行部署带来了新的工程挑战——不同请求可能会路由到不同专家，怎么高效调度是一个专门的工程问题，具体做法留给 Topic③ 细讲。</p>
+            <p><strong>呼应 Pretraining</strong>：MoE 训练要额外处理负载均衡问题，这也解释了为什么同样规模的 MoE 模型，训练调参的复杂度通常比稠密模型更高。</p>
+            <p><strong>往下一篇的伏笔</strong>：MoE 解决的是「怎么用更少的计算撑起更大的知识容量」，但还有另一个独立的问题——上下文一旦变得很长，模型该怎么在不炸显存、不明显变笨的前提下处理，这是下一篇 Long Context 要讲的内容。</p>
+
+            <!-- ========== 6、常见误区 ========== -->
+            <h2 id="wuqu">六、常见误区</h2>
+
+            <h3>误区一：MoE 模型比同参数量的稠密模型一定更便宜更快</h3>
+            <p><strong>真相</strong>：要看比较的是总参数量还是激活参数量。如果拿 MoE 的总参数量去跟一个同等规模的稠密模型比，MoE 通常更快；但如果 MoE 的激活参数量本身就和某个稠密模型相当，两者的推理速度未必有本质差异——真正决定推理成本的是激活参数量，不是总参数量。</p>
+
+            <h3>误区二：MoE 节省了显存开销</h3>
+            <p><strong>真相</strong>：MoE 主要节省的是计算量（激活参数少），不是显存——所有专家参数都要常驻显存以应对不同 Token 的路由需求，显存需求通常跟总参数量挂钩，不会因为「只激活了一部分」而明显减少。</p>
+
+            <h3>误区三：MoE 的专家各自专门负责某个人类能理解的知识领域</h3>
+            <p><strong>真相</strong>：实际观察下来，专家的分工通常不是按「这个专家管数学、那个专家管语言」这种人类容易理解的语义主题划分的，更多是一种数据驱动、不那么直观的模式划分，不能简单假设某个专家就是「数学专家」。</p>
+
+            <h3>误区四：MoE 架构自动就能避免负载不均衡问题</h3>
+            <p><strong>真相</strong>：路由器是训练出来的，天然容易出现「少数专家吃掉大部分流量」的倾向，必须靠额外的负载均衡损失函数去强制纠正，不是 MoE 架构自带的免费保证。</p>
+            <blockquote>💡 <strong>判断一个 MoE 模型好不好用，别只问「参数量多大」，要问清楚「总参数量多大」和「激活参数量多大」，这是两个决定不同成本的独立答案。</strong></blockquote>
+
+            <!-- ========== 7、总结 ========== -->
+            <h2 id="jieyu">七、总结：不是员工变聪明了，是分工变精细了</h2>
+            <p><strong>给小白的话</strong>：下次看到一个模型标着「XX 亿参数」，如果它是 MoE 架构，记得多问一句「激活参数量是多少」——这个数字才更接近你实际会感受到的速度和成本。</p>
+            <p><strong>给开发者的话</strong>：MoE 把「总参数量」和「激活参数量」拆成了两个独立的指标，分别对应显存/存储成本和推理算力成本——选型时把这两个数字分清楚，才能真正判断一个 MoE 模型是不是适合你的场景。同时也要清楚，MoE 省的是算力，不是显存，训练时还多了一层负载均衡的复杂度，这些都是它相对稠密模型额外要付出的工程代价。</p>
+            <blockquote>💡 <strong>稠密模型是全员出席的会议，MoE 是按需召集的专家会诊——省下的是每次开会的人力成本，但所有专家的工位，还是得一直留着。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：Fedus et al., <em>Switch Transformer</em> 相关研究（2021，Google）；Jiang et al. 关于 Mixtral 稀疏专家模型的相关工作</p>
+
+            <!-- 跨文章导航：Foundation 专题第七篇，上一篇 Inference，下一篇 Long Context -->
+            <nav class="article-nav">
+                <a href="inference.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">⚡ Inference</span>
+                    </span>
+                </a>
+                <a href="long-context.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一篇</span>
+                        <span class="nav-title">📏 Long Context</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
