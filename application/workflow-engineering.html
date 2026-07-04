@@ -1,17 +1,20 @@
 <!DOCTYPE html>
+<!-- 文章页：Workflow Engineering 工业级落地（全新撰写：从步骤编排到可验收的协作系统） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workflow Engineering 工业级落地 · kipozannaki</title>
     <meta name="description" content="Workflow Engineering 工业级落地的双栖科普：小白看懂，开发者有收获">
+    <!-- 跨页主题恢复：application.html 等页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
     <script>
     (function() {
         try {
             var saved = localStorage.getItem('theme');
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
-        } catch (e) { }
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
     })();
     </script>
     <link rel="stylesheet" href="../style.css">
@@ -22,156 +25,338 @@
         <nav class="site-nav">
             <a href="application.html">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
         </nav>
     </header>
     <article class="article-page">
         <header class="article-header">
-            <h1>⚙️ Workflow Engineering 工业级落地</h1>
-            <p class="meta">从"步骤堆砌"到"可验收的协作系统" · 双栖科普</p>
+            <h1>🏭 Workflow Engineering 工业级落地：从步骤编排到可验收的协作系统</h1>
+            <p class="meta">从一段能跑通的 Prompt，到一套能上线、能运维、能被同事接手的工作流系统 · 双栖科普</p>
         </header>
         <div class="article-body">
-            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#plan">Plan</a> · <a href="#spec">Spec</a> · <a href="#zuobiao">坐标</a> · <a href="#moshi">设计模式</a> · <a href="#zhuangtai">状态管理</a> · <a href="#cuowu">错误处理</a> · <a href="#kuangjia">框架对比</a> · <a href="#shizhan">实战案例</a> · <a href="#xunhuan">与 Loop 的衔接</a> · <a href="#jieyu">结语</a></p>
-            <h2 id="intro">一、引言：为什么 Workflow 不是"把几个步骤串起来"</h2>
-            <p>很多人对 Workflow 的理解停留在一张简单的流程图：<strong>步骤 A → 步骤 B → 步骤 C → 完成</strong>。结果上线后发现：步骤 B 的输出格式步骤 C 接不住、中间某步失败了不知道回退到哪、整个流程跑完了但结果根本不对。</p>
-            <p><strong>问题出在哪？</strong>这三个地方都可能：</p>
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#why">为什么 Prompt 不等于 Workflow</a> · <a href="#how">Workflow 的最小单元</a> · <a href="#plumbing">上下文工程：Workflow 的血液</a> · <a href="#orchestration">调度：谁在什么时候跑谁</a> · <a href="#verification">可验收：让结果可被信任</a> · <a href="#evolution">迭代：让 Workflow 不腐烂</a> · <a href="#tooling">工具与选型</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <!-- ========== 0、引言 ========== -->
+            <h2 id="intro">零、引言：从「能跑通」到「能上线」，中间隔着一整套工程</h2>
+            <p>先扔几个问题，看你中过几个：</p>
             <ul>
-                <li><strong>Plan 没想清</strong>——步骤拆得太粗，一个步骤里塞了太多事；或者拆得太碎，步骤之间来回传数据，耦合得像 spaghetti</li>
-                <li><strong>Spec 没写明白</strong>——"步骤 B 处理数据"，处理成什么样算对？输出格式是什么？失败怎么办？没定义清楚，等于没定义</li>
-                <li><strong>状态没管好</strong>——步骤 A 改了全局变量，步骤 B 读了以为是对的，其实步骤 A 中途失败了没回滚，数据已经脏了</li>
+                <li>为什么你写了一段看起来很精妙的 Prompt，在 Demo 里表现惊艳，集成到产品里却时灵时不灵？</li>
+                <li>为什么你和同事的 LLM 调用脚本风格差不多，但他三天就能上线，而你拖了两周还在调环境？</li>
+                <li>为什么你给团队搭建了一个号称「自动化」的 LLM 流程，结果每次出问题都要靠你本人手工排查？</li>
+                <li>为什么同样的一段生成任务，加了「可观测、可回滚、可灰度」之后，开发效率反而比裸跑 Prompt 高出一大截？</li>
             </ul>
-            <p><strong>Workflow Engineering 干的事</strong>：从"怎么拆步骤"开始、经过"每一步的验收标准是什么"、"步骤之间怎么传数据"、"错了怎么回退"，设计一套<strong>从输入到输出的可验收协作系统</strong>。Workflow 不是一张流程图，而是一套有 Plan、有 Spec、有状态管理、有错误处理的工程规范。</p>
-            <blockquote>💡 <strong>Workflow 是"让多个步骤协作完成一件事"，但怎么拆、每一步做到什么程度算对、错了怎么修，每一步都需要设计。</strong></blockquote>
-            <h2 id="plan">二、Plan：步骤序列的"拓扑图"</h2>
-            <p>Plan 回答的是：<strong>这件事需要分几步？哪些步骤可以并行？步骤之间的依赖关系是什么？</strong></p>
-            <p>Plan 不是"怎么做"，而是<strong>"有哪些步骤、什么顺序、什么依赖关系"</strong>。</p>
-            <h3>2.1 拆步骤的原则</h3>
-            <p><strong>原则一：一个步骤只做一件事</strong></p>
-            <p>反例："审查代码并生成修复建议并提交 PR"——这是三件事。拆成三个步骤：审查 → 生成建议 → 提交 PR。</p>
-            <p><strong>原则二：步骤的边界由数据流决定</strong></p>
-            <p>什么时候该拆？看数据：如果步骤 A 的输出是步骤 B 的输入，且中间数据需要被验证，那就该拆。</p>
-            <p><strong>原则三：并行还是串行，看依赖不看直觉</strong></p>
-            <p>直觉上"先查数据再分析"是串行，但如果"查数据"可以拆成"查数据库"和"查缓存"两个独立操作，它们就可以并行。Plan 的关键是画出<strong>依赖图（DAG）</strong>，而不是时间线。</p>
-            <h3>2.2 Plan 的表示方式</h3>
-            <pre><code>Workflow: 代码审查自动化
-├── 步骤 1: 获取提交差异 (输入: commit SHA, 输出: diff)
-│   └── 依赖: 无
-├── 步骤 2: 静态分析 (输入: diff, 输出: 分析报告)
-│   └── 依赖: 步骤 1
-├── 步骤 3: 安全扫描 (输入: diff, 输出: 安全报告)
-│   └── 依赖: 步骤 1  (与步骤 2 并行)
-├── 步骤 4: 汇总结果 (输入: 分析报告 + 安全报告, 输出: 审查报告)
-│   └── 依赖: 步骤 2, 步骤 3
-└── 步骤 5: 提交评论 (输入: 审查报告, 输出: PR 评论)
-    └── 依赖: 步骤 4</code></pre>
-            <h2 id="spec">三、Spec：每个步骤的"验收标准"</h2>
-            <p>Spec 回答的是：<strong>这一步的输入是什么、输出是什么、算对了的标准是什么、错了怎么办。</strong></p>
-            <h3>3.1 整体 Workflow 的 Spec</h3>
-            <pre><code>【Workflow 整体 Spec】
-输入: GitHub 提交事件（commit SHA）
-输出: 审查报告（markdown）+ 是否允许合并（boolean）
+            <p>这四个问题背后，都指向同一个主题：<strong>Workflow Engineering（工作流工程）</strong>。它不是 Prompt 的同义词，也不是 Agent 的高级版本，而是<strong>让一次性的 LLM 调用变成可交付、可维护、可被同事接手的工业级系统</strong>这件事本身。</p>
+            <p>本篇会按工程实施顺序展开：从「为什么 Prompt 不等于 Workflow」开始，到「上下文工程」、「调度」、「可验收」、「迭代」，再到「工具选型」与「常见误区」。一篇文章把一条 Workflow 从零到上线的全过程讲透。</p>
+            <blockquote>💡 <strong>Prompt 是一句请求，Workflow 是一套让请求被稳定、正确、可被观测地送达的工程系统。前者拼表达，后者拼工程。</strong></blockquote>
 
-【整体验收标准】
-- 所有 3 个检查维度都必须完成（不能因为某个失败就跳过其他）
-- 报告必须在 10 分钟内生成
-- 如果有阻塞性问题，必须有"后续步骤"的建议
-
-【整体失败处理】
-- 某个检查超时 → 标记为"检查未完成"，不阻塞其他检查
-- 汇总阶段失败 → 回退到前一个 checkpoint，重新汇总
-- 整体超时 → 生成部分报告，标记为"超时中止"</code></pre>
-            <h3>3.2 单个步骤的 Spec 模板</h3>
-            <pre><code>步骤 4: 汇总结果
-
-【输入】
-- 分析报告（JSON，含问题列表和严重程度）
-- 安全报告（JSON，含漏洞列表和风险等级）
-
-【输出】
-- 审查报告（Markdown，含摘要、详细问题、修复建议）
-- 是否阻塞合并（boolean）
-
-【验收标准】
-- 报告必须包含"摘要"、"详细问题"、"修复建议"三个部分
-- 阻塞性问题的判定标准：严重程度为"critical"或安全等级为"high"
-- 报告长度不超过 2000 字
-
-【失败处理】
-- 输入格式不对 → 尝试解析，解析失败则标记为"输入异常"
-- 生成报告超时（> 2 分钟）→ 输出简化版报告，标记"部分生成"
-- 输出不符合 schema → 重新生成一次，仍失败则人工介入</code></pre>
-            <p>关键：<strong>Spec 必须可验证</strong>。"输出一份好报告"不是 Spec，"报告必须包含三个部分、不超过 2000 字"才是。</p>
-            <h2 id="zuobiao">四、Workflow 在工程体系里的坐标</h2>
+            <!-- ========== 1、为什么 Prompt 不等于 Workflow ========== -->
+            <h2 id="why">一、为什么 Prompt 不等于 Workflow？</h2>
+            <p>很多人第一次接触 LLM 落地时，会把「Prompt 写得好」等同于「流程做得好」。这种幻觉在前几次调用时确实成立——只要 Prompt 写得够准，单次调用的质量就已经够用。但当你开始把它<strong>嵌入到一个真实业务里</strong>，问题就会一层一层浮上来：</p>
             <table>
-                <thead><tr><th>层级</th><th>管什么</th><th>与 Workflow 的关系</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>维度</th>
+                        <th>Prompt（一次性请求）</th>
+                        <th>Workflow（工程系统）</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>Prompt</td><td>单轮输入怎么写</td><td>Workflow 的每个步骤都需要 Prompt 来告诉模型干什么</td></tr>
-                    <tr><td>Context</td><td>单次会话里喂什么</td><td>Workflow 的状态可能很大，Context 负责只喂必要信息</td></tr>
-                    <tr><td>RAG</td><td>外部知识怎么接进来</td><td>Workflow 步骤可能需要调用 RAG</td></tr>
-                    <tr><td>Agent</td><td>单个自主实体</td><td>Workflow 的每个步骤通常是一个 Agent 或 Agent 的一次调用</td></tr>
-                    <tr><td>Skill</td><td>打包可复用能力</td><td>Workflow 可以把整个 Workflow 本身打包成一个 Skill</td></tr>
-                    <tr><td>Harness</td><td>单次 Agent 运行的环境</td><td>Workflow 的每个步骤运行在 Harness 中</td></tr>
-                    <tr><td>Loop</td><td>跨多次运行的调度</td><td>Loop 触发/管理 Workflow 实例</td></tr>
+                    <tr>
+                        <td>目标</td>
+                        <td>让这一次回答尽可能好</td>
+                        <td>让这个流程在一段时间内稳定地好</td>
+                    </tr>
+                    <tr>
+                        <td>关注点</td>
+                        <td>措辞、例子、约束</td>
+                        <td>上下文、调度、错误处理、观测</td>
+                    </tr>
+                    <tr>
+                        <td>失败方式</td>
+                        <td>答得不好</td>
+                        <td>超时、重复、丢消息、漏环节、雪崩</td>
+                    </tr>
+                    <tr>
+                        <td>维护者</td>
+                        <td>作者本人</td>
+                        <td>整个团队</td>
+                    </tr>
+                    <tr>
+                        <td>演进</td>
+                        <td>想到就改</td>
+                        <td>有版本、可回滚、有灰度</td>
+                    </tr>
                 </tbody>
             </table>
-            <h2 id="moshi">五、设计模式：不只是"步骤 A → 步骤 B"</h2>
-            <p><strong>不同场景应该选什么模式？用这个决策树</strong>：</p>
-            <pre><code>Workflow 需要在运行时根据结果动态改变路径？
-├─ 是 → 状态机（允许分支、条件跳转）
-└─ 否 ↓
+            <p>看这张表就能理解：Prompt 解决的是「这一刻说什么」，Workflow 解决的是「这件事怎么被可靠地做完」。前者是文案工作，后者是工程工作——两者需要的技能栈几乎不重合。</p>
+            <blockquote>💡 <strong>Prompt 是文字，Workflow 是系统。把好文字塞进差系统，得到的依然是差系统。</strong></blockquote>
 
-步骤之间有依赖？能否并行执行？
-├─ 完全线性、无法并行 → 线性链
-├─ 有部分分支可并行 → DAG
-└─ 完全独立、解耦为上 → 事件驱动</code></pre>
-            <h2 id="zhuangtai">六、状态管理：Workflow 的"记忆"</h2>
-            <p>Checkpoint 机制：在每个关键步骤完成后，保存当前状态，中断后从断点恢复。</p>
-            <h2 id="cuowu">七、错误处理：Workflow 的"安全气囊"</h2>
+            <!-- ========== 2、Workflow 的最小单元 ========== -->
+            <h2 id="how">二、Workflow 的最小单元：四件事缺一不可</h2>
+            <p>把所有工作流系统的共性抽象出来，你会发现任何一个能上线的 Workflow 至少包含四个最小单元：</p>
+            <ol>
+                <li><strong>输入规整（Normalization）</strong>：外部请求千奇百怪——用户输入的 prompt、上一环节传过来的 JSON、第三方 API 的回调——必须先归一化到 Workflow 内部期望的格式。</li>
+                <li><strong>上下文构造（Context Composition）</strong>：把<strong>指令</strong>、<strong>历史</strong>、<strong>检索结果</strong>、<strong>工具输出</strong>等按正确顺序拼成最终要发给模型的 payload（详见 prompt-engineering.html、context-engineering.html、rag-engineering.html）。</li>
+                <li><strong>模型调用 + 后处理（Generation & Post-process）</strong>：调用 LLM，解析返回（JSON / Markdown / 结构化字段），按下游期望再加工。</li>
+                <li><strong>结果落地（Persistence & Side Effect）</strong>：把最终结果写回数据库、发到消息队列、回调上游、或者更新内部状态。</li>
+            </ol>
+            <p>这四件事看起来朴素，但「少做一件」几乎必然导致系统脆弱：</p>
+            <ul>
+                <li>不做输入规整 → 上游一个字段改名，你整条链路挂掉。</li>
+                <li>不做上下文构造 → 上下文窗口爆掉，或者上下文里夹带了用户敏感信息。</li>
+                <li>不做后处理 → 拿到一段自由文本，后面的代码无从下手。</li>
+                <li>不做结果落地 → 用户看不到结果，下一环节拿不到输入，整个流程变成「黑盒跑了一下」。</li>
+            </ul>
+            <blockquote>💡 <strong>Workflow 的工程价值，不在某一个环节做得多么精妙，而在四个环节的衔接没有断点。</strong></blockquote>
+
+            <!-- ========== 3、上下文工程：Workflow 的血液 ========== -->
+            <h2 id="plumbing">三、上下文工程：Workflow 的血液</h2>
+            <p>Workflow Engineering 的第一道关，是<strong>上下文工程</strong>。一条工作流里几乎每一步都在读写上下文：</p>
+            <ul>
+                <li>用户输入是上下文的一部分。</li>
+                <li>RAG 检索回来的文档片段是上下文的一部分。</li>
+                <li>上一环节模型的输出，是下一环节模型的上下文。</li>
+                <li>工具调用（Tool Call）的返回值，是补全上下文的「外部记忆」。</li>
+            </ul>
+            <p>一个常被忽视的事实是：<strong>同一个 Workflow 里，不同环节对上下文的需求是不一样的</strong>。</p>
             <table>
-                <thead><tr><th>失败类型</th><th>表现</th><th>策略</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>环节</th>
+                        <th>上下文需求</th>
+                        <th>典型错误</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>瞬时失败</td><td>API 超时、网络抖动</td><td>指数退避重试，最多 3 次</td></tr>
-                    <tr><td>逻辑失败</td><td>输出格式错、不符合 schema</td><td>fallback_chain：重试 → 换模型 → 人工</td></tr>
-                    <tr><td>不可恢复失败</td><td>权限不足、资源不存在</td><td>立即终止，报告错误</td></tr>
-                    <tr><td>依赖失败</td><td>上游步骤失败</td><td>关键依赖终止，可选依赖降级</td></tr>
-                    <tr><td>Workflow 级失败</td><td>状态损坏、超时、资源耗尽</td><td>Checkpoint 恢复 / Cleanup / 人工</td></tr>
+                    <tr>
+                        <td>分类 / 路由</td>
+                        <td>短、聚焦、信噪比高</td>
+                        <td>塞了完整历史 → 分类器被无关历史带偏</td>
+                    </tr>
+                    <tr>
+                        <td>改写 / 扩写</td>
+                        <td>原始素材 + 改写目标</td>
+                        <td>忘了给目标受众信息 → 改写风格跑偏</td>
+                    </tr>
+                    <tr>
+                        <td>检索问答</td>
+                        <td>问题 + 检索 Top-K 片段</td>
+                        <td>Top-K 太大，噪声盖过信号</td>
+                    </tr>
+                    <tr>
+                        <td>工具调用</td>
+                        <td>完整任务描述 + 工具描述 + 上一步返回</td>
+                        <td>工具描述不更新 → 选了老版本接口</td>
+                    </tr>
+                    <tr>
+                        <td>汇总 / 报告</td>
+                        <td>多个子任务产出的全量数据</td>
+                        <td>遗漏了关键子任务 → 报告缺一块</td>
+                    </tr>
                 </tbody>
             </table>
-            <h2 id="kuangjia">八、主流方案对比</h2>
-            <div class="table-scroll">
+            <p>Context Engineering 在 Workflow 里的核心使命是：<strong>让「该看见的」环节能稳定看见，「不该看见的」环节不被干扰</strong>。这一节的具体手法（隔离、压缩、剪枝、检索）见 <a href="context-engineering.html">context-engineering.html</a>。</p>
+            <blockquote>💡 <strong>Workflow 的脆弱性，绝大多数来自上下文拼装时多塞了或少给了一块。上下文不是越多越好，是越「对位」越好。</strong></blockquote>
+
+            <!-- ========== 4、调度：谁在什么时候跑谁 ========== -->
+            <h2 id="orchestration">四、调度：谁在什么时候跑谁</h2>
+            <p>Workflow 的第二道关，是<strong>调度（Orchestration）</strong>。调度要回答三个问题：</p>
+            <ul>
+                <li><strong>顺序</strong>：步骤 A 在步骤 B 之前还是之后？能不能并行？</li>
+                <li><strong>分支</strong>：在什么条件下走分支 1，什么条件下走分支 2？</li>
+                <li><strong>失败</strong>：一步失败之后是重试、跳过、回滚、还是人工介入？</li>
+            </ul>
+            <p>这三个问题看起来是「流程图」层面的事，但每一条都直接影响工程的稳定性。最容易踩的几个坑：</p>
             <table>
-                <thead><tr><th>框架</th><th>核心特点</th><th>适用场景</th><th>缺点</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>常见反模式</th>
+                        <th>翻车现场</th>
+                        <th>正确做法</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    <tr><td>LangGraph</td><td>与 LangChain 生态深度集成，图结构定义 Workflow</td><td>快速迭代、LLM 密集型 Workflow</td><td>不适合需要企业级可靠性的场景</td></tr>
-                    <tr><td>Temporal</td><td>企业级持久化、分布式执行、自动重试和补偿</td><td>长流程、关键业务、需要中断恢复</td><td>学习曲线陡、基础设施重</td></tr>
-                    <tr><td>LlamaIndex Workflows</td><td>面向 RAG 场景，与 LlamaIndex 生态集成</td><td>RAG 密集型、数据流复杂的 Workflow</td><td>新生态，社区沉淀少</td></tr>
-                    <tr><td>自研</td><td>完全可控，可定制审计日志、特殊权限管理</td><td>有强定制需求、已有成熟基础设施</td><td>维护成本高</td></tr>
+                    <tr>
+                        <td>无限重试</td>
+                        <td>下游 API 限流，重试 100 次，账单爆炸</td>
+                        <td>指数退避 + 最大重试次数 + 死信队列</td>
+                    </tr>
+                    <tr>
+                        <td>无序并发</td>
+                        <td>三个并行调用之间有依赖，结果混乱</td>
+                        <td>显式声明依赖（Promise/TaskGraph/DAG）</td>
+                    </tr>
+                    <tr>
+                        <td>静默失败</td>
+                        <td>某一步抛异常被吞掉，整条流程返回「成功」但实际是残缺结果</td>
+                        <td>明确标注 Partial Success / 失败原因 / 失败位置</td>
+                    </tr>
+                    <tr>
+                        <td>硬编码分支</td>
+                        <td>用 Prompt 文本「如果 X 就...」控制分支，分支逻辑散落各处</td>
+                        <td>把分支提到 Workflow 层（if/else/switch），Prompt 只负责该环节内的推理</td>
+                    </tr>
                 </tbody>
             </table>
-            </div>
-            <h2 id="jieyu">十二、结语：Workflow 是"协作"的基础</h2>
-            <p><strong>给小白的话</strong>：Workflow 就是"让多个步骤协作完成一件事"。但不是简单地把步骤串起来，而是要想清楚：这件事分几步、每步做什么、做到什么程度算对、错了怎么办。</p>
-            <p><strong>给开发者的话</strong>：Workflow 系统的性能瓶颈很少在"步骤执行有多快"，而在"步骤之间的数据流是否清晰、Spec 是否可验证、错了是否能恢复"。优化 Workflow 要从设计阶段开始——Plan 画清楚依赖图、Spec 写明白验收标准、状态管理选好持久化策略、错误处理分好层。</p>
-            <blockquote>💡 <strong>Workflow 不是万能药，但它是现代 AI 应用从"玩具"变成"工具"的关键。</strong></blockquote>
-            <p class="refs"><strong>参考资料</strong>：Temporal 官方文档、LangGraph 官方文档、AWS Step Functions 最佳实践</p>
+            <p>这一节的工具映射详见 <a href="agent.html">agent.html</a> 和 <a href="harness-engineering.html">harness-engineering.html</a>——Agent 与 Harness 是 Workflow 在「自主循环」与「执行容器」两个方向上的极端形态。</p>
+            <blockquote>💡 <strong>调度的本质是显式化：让所有「什么时候跑什么」都被代码、配置或图结构明确写出来，而不是埋在 Prompt 的 if 字眼里。</strong></blockquote>
+
+            <!-- ========== 5、可验收：让结果可被信任 ========== -->
+            <h2 id="verification">五、可验收：让结果可被信任</h2>
+            <p>Workflow Engineering 与「跑个脚本」的分水岭，几乎总是出现在「<strong>可验收</strong>」这一步。</p>
+            <p>Prompt 写得好，模型可能仍然出错的根本原因是：<strong>LLM 的输出是概率性的</strong>。同一段指令，模型在两次调用里给出的答案可能差出 30%。Workflow 工程的使命就是<strong>在概率性之上建立确定性</strong>。常见手段有四：</p>
+            <ol>
+                <li><strong>结构化输出（Structured Output）</strong>：要求模型返回 JSON Schema / Tool Call，禁止自由文本。</li>
+                <li><strong>多采样投票（Best-of-N / Self-Consistency）</strong>：同一个任务跑 N 次，挑选最一致的答案。</li>
+                <li><strong>断言式校验（Assertion）</strong>：模型返回后用规则 / 二次模型 / 代码做「事实 / 格式 / 业务约束」的硬检查。</li>
+                <li><strong>人机协作兜底（Human-in-the-Loop）</strong>：低置信度结果不进下游，抛给人工审核。</li>
+            </ol>
+            <p>这四件事不一定要全做，但要至少做一件。完全没有可验收机制的工作流，撑不过第一次生产事故。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>可验收手段</th>
+                        <th>适合场景</th>
+                        <th>代价</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>结构化输出</td>
+                        <td>几乎所有可编程下游</td>
+                        <td>Prompt 模板需要更精确</td>
+                    </tr>
+                    <tr>
+                        <td>多采样投票</td>
+                        <td>答案非黑即白（数学、分类、抽取）</td>
+                        <td>成本 3-5 倍</td>
+                    </tr>
+                    <tr>
+                        <td>断言式校验</td>
+                        <td>有强业务规则 / 法规约束</td>
+                        <td>需要写校验代码或校验模型</td>
+                    </tr>
+                    <tr>
+                        <td>人机协作</td>
+                        <td>高风险 / 低频 / 高价值</td>
+                        <td>需要审核界面 + 排班</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>可验收不是给 Workflow 加「保险」，而是把「可能出错」变成「出错可被立刻发现」。前者增加成本，后者让系统值得上线。</strong></blockquote>
+
+            <!-- ========== 6、迭代：让 Workflow 不腐烂 ========== -->
+            <h2 id="evolution">六、迭代：让 Workflow 不腐烂</h2>
+            <p>任何一个 Workflow 都会随时间腐烂——上游 API 改名、模型升级、Prompt 效果漂移、业务规则变化。如果不把「迭代」本身工程化，Workflow 就会在三个月内从「可上线」变成「不可维护」。</p>
+            <p>工业级 Workflow 的迭代工程，至少包含五件事：</p>
+            <ul>
+                <li><strong>版本化（Versioning）</strong>：Prompt、配置、模型选择都进版本管理，能 diff、能回滚。</li>
+                <li><strong>可观测（Observability）</strong>：每一步的输入、输出、耗时、Token 成本、错误码全部落库，能查能分析。</li>
+                <li><strong>评估集（Eval Set）</strong>：维护一份「典型输入 + 期望输出」的黄金集，每次改 Workflow 跑一遍回归。</li>
+                <li><strong>灰度发布（Canary / Shadow）</strong>：新版本先跑 1% 流量，对比新旧版本的指标差异再全量。</li>
+                <li><strong>回滚预案（Rollback）</strong>：指标不达标秒级切回上一版本，不让用户当试验品。</li>
+            </ul>
+            <p>这一节的工程细节与 Harness Engineering 高度重合，详见 <a href="harness-engineering.html">harness-engineering.html</a>。</p>
+            <blockquote>💡 <strong>Workflow 不是一次性工程，是一个需要「持续照料」的生命体。照料的标准动作就是：版本、可观测、评估、灰度、回滚。</strong></blockquote>
+
+            <!-- ========== 7、工具与选型 ========== -->
+            <h2 id="tooling">七、工具与选型：别为框架而框架</h2>
+            <p>工具选型的第一原则是：<strong>用最小的工具解决当前问题</strong>。不要因为 LangGraph / Temporal / Prefect 看起来酷，就硬上。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工作流复杂度</th>
+                        <th>推荐起点</th>
+                        <th>典型工具</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>单步 / 串行</td>
+                        <td>纯 Python / Node 脚本</td>
+                        <td>requests、httpx、SDK</td>
+                    </tr>
+                    <tr>
+                        <td>分支 / 简单循环</td>
+                        <td>显式状态机</td>
+                        <td>自研 if/else、Statemachine 库</td>
+                    </tr>
+                    <tr>
+                        <td>并行 / 复杂依赖</td>
+                        <td>任务图（DAG）框架</td>
+                        <td>Prefect、Dagster、Airflow、LangGraph</td>
+                    </tr>
+                    <tr>
+                        <td>长时 / 跨进程 / 跨服务</td>
+                        <td>工作流引擎</td>
+                        <td>Temporal、AWS Step Functions、Cloud Workflows</td>
+                    </tr>
+                    <tr>
+                        <td>Agent 化探索</td>
+                        <td>Agent 框架</td>
+                        <td>LangGraph、AutoGen、CrewAI</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>选型上有一条经验法则：<strong>在没有遇到痛点之前，不要为抽象买单</strong>。Workflow 工程师最容易犯的错是「为了用框架而用框架」——结果一个原本 200 行脚本能搞定的事，被拆成 DAG + Worker + Orchestrator 三件套，调试时间比开发时间还长。</p>
+            <blockquote>💡 <strong>工具是 Workflow 的脚手架，不是 Workflow 本身。脚手架该拆就拆，房子本身要稳。</strong></blockquote>
+
+            <!-- ========== 8、常见误区 ========== -->
+            <h2 id="wuqu">八、常见误区（翻车现场）</h2>
+
+            <h3>误区一：Workflow = 几个 Prompt 拼一起</h3>
+            <p><strong>翻车现场</strong>：把 3 段 Prompt 用字符串拼接起来当 Workflow，结果第一个 Prompt 改了之后第二个忘了同步，最后整条流程在不同环境表现完全不一致。</p>
+            <p><strong>真相</strong>：Workflow 的每一个环节都是工程单元——有自己的输入契约、输出契约、错误处理、版本号。Prompt 只是其中一个组件。</p>
+
+            <h3>误区二：只要 Prompt 调对了，Workflow 就稳了</h3>
+            <p><strong>翻车现场</strong>：花了一周调 Prompt，体感效果终于达标；结果上线第一天就因为下游服务超时整条链路雪崩。</p>
+            <p><strong>真相</strong>：Prompt 调对只解决了「模型输出质量」的问题；超时、重试、并发、限流这些「非模型问题」才是 Workflow 工程的主战场。</p>
+
+            <h3>误区三：让 LLM 来决定流程分支</h3>
+            <p><strong>翻车现场</strong>：让模型判断「下一步该跑哪个分支」，结果同一个输入在两次调用里走了不同分支，下游被迫同时维护两套结果解析。</p>
+            <p><strong>真相</strong>：分支逻辑应该提到 Workflow 层，LLM 只负责环节内的内容生成。把控制流交给概率性系统，得到的不是 Workflow，是混乱。</p>
+
+            <h3>误区四：可观测 = 加几行 print</h3>
+            <p><strong>翻车现场</strong>：上线后才发现某一步在 0.1% 的输入上悄悄失败，靠用户投诉才反应过来。</p>
+            <p><strong>真相</strong>：可观测至少包含「每一步的输入快照、输出快照、耗时、Token 消耗、错误码」五要素，落库到可查询的存储里。光 print 只能告诉你「这里跑过了」，不能告诉你「这里对不对」。</p>
+
+            <h3>误区五：Workflow 一上线就再也不用改</h3>
+            <p><strong>翻车现场</strong>：上线第一天一切正常；三个月后模型升级一次，输出格式变了，下游全挂；再过两个月业务规则改了，没人知道在哪改 Prompt。</p>
+            <p><strong>真相</strong>：Workflow 是持续演进的工程系统。版本化、可观测、评估集、灰度、回滚——这些不是「将来某天需要」，是「上线第一天就需要」。</p>
+            <blockquote>💡 <strong>把 Workflow 当一次性的脚本来写，是给自己埋的定时炸弹；把它当一个长期维护的系统来设计，才叫 Workflow Engineering。</strong></blockquote>
+
+            <!-- ========== 9、总结 ========== -->
+            <h2 id="jieyu">九、总结：Workflow Engineering，是把 LLM 当工程系统来对待</h2>
+            <p><strong>给小白的话</strong>：下次你看到「我们用 AI 做了个自动化流程」这句话时，多问一句——<em>这套流程出错的时候，会发生什么？</em>如果对方的回答是「靠人盯着」，那它还不是一个 Workflow，只是一个 Prompt 串。</p>
+            <p><strong>给开发者的话</strong>：Workflow Engineering 是一门将「一次性 Prompt 体验」转化为「长期稳定系统」的工程学科。它的核心不是用更高级的模型，不是用更花哨的框架，而是<strong>把输入规整、上下文构造、模型调用、结果落地这四件事做扎实</strong>，并把可观测、可验收、可迭代做成系统的第一公民。当你下次再被「为什么我们的 AI 功能时灵时不灵」困住时，回到这四件事一项一项检查——问题大概率就藏在这四个环节的某一个衔接处。</p>
+            <blockquote>💡 <strong>Prompt Engineering 解决「让模型答对」，Workflow Engineering 解决「让流程在长时间内都对」。前者是文案，后者是工程——而工程，才是 LLM 真正能进入生产环境的最后一道门。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：LangGraph / Temporal / Prefect 等工作流框架文档；Anthropic、OpenAI 官方关于 Structured Output / Function Calling 的工程实践；工业界关于 LLM Workflow 灰度发布与 Eval-Driven Development 的相关讨论。</p>
+
+            <!-- 跨文章导航：Application 专题第八篇，闭环到 Loop Engineering -->
             <nav class="article-nav">
                 <a href="harness-engineering.html" class="nav-card nav-prev">
                     <span class="nav-arrow">←</span>
                     <span class="nav-content">
-                        <span class="nav-label">上一站</span>
-                        <span class="nav-title">🔧 Harness Engineering</span>
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🛠️ Harness Engineering</span>
                     </span>
                 </a>
                 <a href="loop-engineering.html" class="nav-card nav-next">
                     <span class="nav-content">
-                        <span class="nav-label">下一站</span>
+                        <span class="nav-label">下一篇</span>
                         <span class="nav-title">🔁 Loop Engineering</span>
                     </span>
                     <span class="nav-arrow">→</span>
                 </a>
             </nav>
+
             <a href="application.html" class="back-link">← 返回 Application 专题</a>
         </div>
     </article>
+
+    <!-- 表格移动端兜底 -->
     <script>
     (function() {
         document.querySelectorAll('.article-body table').forEach(function(t) {
@@ -183,6 +368,7 @@
         });
     })();
     </script>
+
     <footer class="site-footer">
         <p>© 2026 · kipozannaki</p>
     </footer>
