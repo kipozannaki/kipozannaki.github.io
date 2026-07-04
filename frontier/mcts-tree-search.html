@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：MCTS / Tree Search（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCTS / Tree Search · kipozannaki</title>
+    <meta name="description" content="为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🌳 MCTS / Tree Search</h1>
+            <p class="meta">为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么不能只靠独立采样</a> · <a href="#how">怎么工作的</a> · <a href="#impact">怎么影响能力</a> · <a href="#engineering">为什么开发者要懂</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></blockquote>
+            <h2 id="intro">引言：下棋 AI 的看家本领，被搬进了语言模型</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么上一篇提到的"多次采样再投票"，在需要多步骤规划的复杂任务上效果有限？</li>
+                <li>蒙特卡洛树搜索（MCTS）这个曾经帮 AlphaGo 击败人类顶尖棋手的算法，是怎么被搬到语言模型的推理过程里的？</li>
+                <li>为什么搜索的"探索"和"利用"要小心平衡——只顾着探索新方向，或者只顾着深挖眼前看起来不错的路径，都会出问题？</li>
+                <li>树搜索的计算成本明显比简单采样更高，为什么在某些任务上依然值得用？</li>
+            </ul>
+            <p>这些问题的答案，都在 <strong>MCTS（Monte Carlo Tree Search，蒙特卡洛树搜索）</strong>这套算法里。上一篇 Inference Scaling 讲清楚了"该花多少推理算力"的宏观规律，本篇要讲的，是<strong>怎么更聪明地花这些算力</strong>——不是简单粗暴地多采样几次，而是有结构地搜索。</p>
+            <blockquote>💡 <strong>多次采样投票是"把好几份答案摆一起比比看"，树搜索是"边走边判断这条路值不值得继续走下去"——后者能更早止损，把算力省给更有希望的方向。</strong></blockquote>
+            <h2 id="zuobiao">MCTS 在这套体系里的坐标</h2>
+            <pre><code>Frontier：Test-Time Compute（多数投票、Best-of-N，都是并行独立采样）
+    ↓
+Frontier：Inference Scaling（该花多少推理算力，宏观预算规律）
+    ↓
+Frontier：MCTS / Tree Search（怎么更聪明地花这些算力：有结构的顺序搜索）  ← 本篇
+    ↓
+Frontier：RLVR（下一篇：用客观可验证的正确性做训练信号）</code></pre>
+            <p><strong>先划清一条边界</strong>：Test-Time Compute 那篇提到的多数投票、Best-of-N，本质是<strong>并行独立采样</strong>——每次生成互不参考，最后比较完整结果。MCTS 是<strong>有结构的、按步骤展开的搜索</strong>——在生成过程中就持续评估"这一步走得好不好"，并据此决定把算力投向哪个分支，两者的搜索方式本质不同。</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>相关概念</th>
+                        <th>跟 MCTS 的关系</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frontier · Test-Time Compute</td>
+                        <td>多数投票是并行独立采样，MCTS 是有结构的顺序搜索——本篇正是要讲清这个区别</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier · Reasoning Model</td>
+                        <td>那篇模型生成的长推理链条，可以理解成一种隐式的、线性的搜索路径；MCTS 则是显式维护多条候选路径，并用价值评估决定深入探索哪一条</td>
+                    </tr>
+                    <tr>
+                        <td>历史背景</td>
+                        <td>MCTS 曾是 AlphaGo / AlphaZero 击败人类顶尖棋手的核心算法组件，如今被借鉴应用到语言模型的推理搜索里</td>
+                    </tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>独立采样是"交好几份卷子挑最好的一份"，树搜索是"写卷子的过程中随时可以擦掉重写，而且知道该往哪个方向重写"——后者更接近人真正解题时的状态。</strong></blockquote>
+            <h2 id="why">为什么不能只靠简单的多次独立采样？</h2>
+            <p>上一篇提到的多数投票、Best-of-N，本质上是让模型独立生成好几份完整答案，再挑一个最好的。这种方式有一个明显的局限：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>方案</th>
+                        <th>怎么做</th>
+                        <th>致命问题</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>独立采样（多数投票 / Best-of-N）</td>
+                        <td>每次生成互不参考，最后比较完整结果</td>
+                        <td>如果一道题需要多个步骤、且中间某一步出错会导致整条路径全错，独立采样很难利用"这一步选对了/选错了"这种中间反馈，只能等到最后才比较完整答案的对错</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>理想情况下，需要一种能在生成过程中就评估"当前这一步走得好不好"，并及时把算力从看起来没希望的分支里抽出来、投入更有希望的分支的机制——这正是搜索树类算法要解决的问题。</p>
+            <blockquote>💡 <strong>独立采样是"赌几次，看哪次运气好"；树搜索是"每走一步都回头看看，觉得不对就趁早改道"——后者更省算力，因为不用把一条明显走偏的路走到底才发现错了。</strong></blockquote>
+            <h2 id="how">MCTS 到底是怎么工作的？</h2>
+            <p>不涉及复杂数学，讲直觉流程。MCTS 的核心是四步循环，反复执行很多次：</p>
+            <p><strong>选择（Selection）</strong>：从搜索树的根节点出发，按照某种策略（平衡"已知效果好的路径"和"还没探索过的路径"）一路往下选，直到走到一个还没被展开过的节点。</p>
+            <p><strong>扩展（Expansion）</strong>：在这个节点上，生成几个可能的下一步候选（比如推理的下一句话，或者下一个具体动作）。</p>
+            <p><strong>模拟／评估（Simulation / Evaluation）</strong>：对新扩展出来的节点，评估这条路径大概率能走到多好的结果——可以用一个价值模型打分，也可以继续沿着这条路径往下模拟一段再看结果。</p>
+            <p><strong>回传（Backpropagation）</strong>：把这次评估的结果，沿着路径往回传播，更新沿途每个节点"这条路值不值得再走"的统计信息。</p>
+            <p>这四步反复循环很多次，搜索树会越来越倾向于把更多计算资源分配到看起来更有希望的分支上，而不是均匀地探索所有可能性。</p>
+            <p>这里有一个核心权衡：<strong>探索与利用（Exploration vs Exploitation）</strong>。完全只走"目前看起来最好"的路径（纯利用），可能会错过一开始被低估、但实际更优的路径；完全随机探索所有路径（纯探索），又会浪费大量算力在明显不行的方向上。好的搜索算法要在两者之间取得平衡，这也是"选择"这一步设计的核心考量。</p>
+            <p>相比简单采样，MCTS 因为有及时的中间反馈和回传机制，能更早"放弃"看起来没希望的分支，把节省下来的算力投入到更有潜力的方向——理论上能比毫无信息交流的独立采样，更高效地利用同样的推理算力预算。</p>
+            <blockquote>💡 <strong>四个步骤合起来做的事情很朴素：走一步、看一眼、记一笔账、把账算清楚再决定下一步该往哪走——只是这个过程要重复成千上万次，才能让搜索树"变聪明"。</strong></blockquote>
+            <h2 id="impact">MCTS 会如何影响模型能力？</h2>
+            <p>只讲真实案例。</p>
+            <h3>为什么直接照搬 AlphaGo 那套 MCTS 参数，用在语言模型上效果不理想？</h3>
+            <p><strong>翻车现场</strong>：把下棋 AI 里用得很成功的 MCTS 参数配置，直接套用到语言模型的推理搜索任务上，发现搜索效率或最终效果都不如预期。</p>
+            <p><strong>根因</strong>：下棋任务有非常清晰、密集的中间反馈信号（每一步棋盘状态都可以被精确评估），而语言生成任务的中间步骤"好不好"往往很难被精确打分——一句话的"推理价值"怎么量化，本身就是一个不容易解决的问题。缺乏可靠的中间评估信号，MCTS 的回传机制效果会大打折扣，这是把棋类 AI 算法直接搬到语言任务上时经常被低估的一个差异。</p>
+            <h3>为什么"探索-利用"参数没调好，搜索树会"一条道走到黑"？</h3>
+            <p><strong>翻车现场</strong>：搜索过程中，树很快就把几乎所有算力都集中投入到了某一条看起来不错的路径上，后来才发现这条路径其实是个死胡同，其他本来可能更优的分支根本没被认真探索过。</p>
+            <p><strong>根因</strong>：探索-利用的权衡参数如果偏向"利用"太多，搜索会过早收敛到局部最优、错过全局更好的路径——这跟 Alignment 那篇提到的强化学习容易陷入局部最优，是类似的问题，只是场景换成了推理时搜索。</p>
+            <h3>为什么树搜索在某些简单任务上完全不划算？</h3>
+            <p><strong>翻车现场</strong>：给一个几步就能想清楚的简单任务套用完整的树搜索流程，发现消耗的算力和时间比直接生成或者简单投票高出好几倍，但最终效果提升却很有限。</p>
+            <p><strong>根因</strong>：树搜索的价值在于任务需要多步骤规划、且中间步骤存在明显好坏之分的复杂场景；对本来就很简单、模型一步就能想明白的任务，搜索树带来的结构化探索优势发挥不出来，只是徒增了算力开销——这呼应了上一篇 Inference Scaling 讲的"任务难度决定该花多少算力"这条规律。</p>
+            <blockquote>💡 <strong>树搜索不是万能加速器，它的优势建立在"中间步骤能被可靠打分"这个前提上——前提不成立，再精巧的搜索算法也发挥不出应有的效果。</strong></blockquote>
+            <h2 id="engineering">为什么开发者一定要懂 MCTS？</h2>
+            <p><strong>呼应 Test-Time Compute</strong>：那篇讲的多数投票、Best-of-N 是并行独立采样，本篇的 MCTS 是有结构的顺序搜索——理解两者的本质区别，才能根据任务特点（是否需要多步骤规划、中间反馈是否可靠）选对方法。</p>
+            <p><strong>呼应 Inference Scaling</strong>：树搜索是"怎么更聪明花算力"的一种具体方案，但依然要先判断这个任务是否值得投入这类相对昂贵的搜索方法，不是所有任务都适合套用完整的树搜索流程。</p>
+            <p><strong>中间评估信号的可靠性</strong>：如果打算在自己的场景里用树搜索类算法，要先想清楚"怎么给中间步骤打分"这件事有没有可靠方案——评估信号不可靠的话，树搜索的优势会大幅削弱。</p>
+            <p><strong>往下一篇的伏笔</strong>：MCTS 依赖一个能给中间步骤打分的价值信号，这个信号从哪来、怎么训练出来才可靠，正是下一篇 RLVR（可验证奖励的强化学习）要回答的问题。</p>
+            <h2 id="wuqu">常见误区</h2>
+            <h3>误区一：MCTS 就是 AlphaGo 用的算法，和语言模型没什么关系</h3>
+            <p><strong>真相</strong>：MCTS 的核心思路（选择-扩展-评估-回传的循环，探索利用权衡）是通用的搜索框架，近年确实被借鉴应用到语言模型的推理搜索里，只是需要针对语言任务的特点做适配，不是简单照搬棋类 AI 的实现。</p>
+            <h3>误区二：树搜索一定比简单的多次采样效果好</h3>
+            <p><strong>真相</strong>：树搜索的优势建立在"中间步骤存在可靠评估信号"这个前提上，如果任务的中间步骤很难被准确打分，树搜索的回传机制发挥不出优势，效果不一定比简单采样好，还会多花不少算力。</p>
+            <h3>误区三：只要多探索，就能避免陷入局部最优</h3>
+            <p><strong>真相</strong>：探索和利用需要精细平衡，过度探索同样会浪费大量算力在明显不行的方向上，不是探索越多越好，关键在于找到适合具体任务的平衡点。</p>
+            <h3>误区四：树搜索适合所有需要推理的任务</h3>
+            <p><strong>真相</strong>：树搜索的算力成本明显高于简单方法，只有在任务确实需要多步骤规划、且中间反馈可靠的场景下才划算，简单任务上是不必要的算力浪费。</p>
+            <blockquote>💡 <strong>判断该不该用树搜索，先问自己：这个任务的中间步骤，能不能被可靠地打分？能，树搜索大概率值得；不能，先解决打分这个问题，否则再精巧的搜索框架也是空中楼阁。</strong></blockquote>
+            <h2 id="jieyu">总结：会走棋的算法，学会了"讲道理"</h2>
+            <p><strong>给小白的话</strong>：下次听说某个 AI 系统用了"树搜索"来解题，可以理解成——它不是简单地多试几次撞运气，而是边试边判断哪条路更有希望，把力气花在刀刃上。</p>
+            <p><strong>给开发者的话</strong>：MCTS 把"选择-扩展-评估-回传"这套源自棋类 AI 的搜索框架，搬进了语言模型的推理过程，核心价值是能利用中间步骤的反馈信号，比无差别的独立采样更高效地分配算力。但这套方法的效果高度依赖"中间步骤能否被可靠评估"这个前提，脱离了这个前提，再精巧的搜索算法也发挥不出应有的效果。</p>
+            <blockquote>💡 <strong>AlphaGo 教会了搜索算法怎么在棋盘上找最优解，语言模型的挑战是——棋盘上每一步的好坏一目了然，但一句话的"好坏"，从来没有那么容易打分。</strong></blockquote>
+            <p><strong>参考资料</strong>：Silver et al. 关于 AlphaGo / AlphaZero 的相关研究；近年将 MCTS 应用于语言模型推理搜索的相关研究工作</p>
+
+            <nav class="article-nav">
+                <a href="inference-scaling.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">📈 Inference Scaling</span>
+                    </span>
+                </a>
+                <a href="rlvr.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🎯 RLVR</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
