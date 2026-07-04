@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：Multimodal Agent（沿用 skill.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multimodal Agent · kipozannaki</title>
+    <meta name="description" content="为什么模型能看图说话，不代表它能成为可用的多模态 Agent">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🖇️ Multimodal Agent</h1>
+            <p class="meta">为什么模型能"看图说话"，不代表它能成为可用的多模态 Agent？一篇讲清"能看见、能看懂、能行动"之间隔着的那几层工程鸿沟。</p>
+        </header>
+        <div class="article-body">
+
+            <h2 id="intro">引言</h2>
+            <p>先问几个听起来简单、实际上没那么简单的问题:</p>
+            <ul>
+                <li>Claude、GPT-4V 都能"看图说话"了,是不是意味着"多模态智能体"这件事已经自动解决了?</li>
+                <li>让 agent 截一张屏幕截图,再让它"看图点击",这跟人用眼睛看屏幕、用手点鼠标,是同一件事吗?</li>
+                <li>机器人伸手去抓一个杯子,结果抓空了——这是"眼睛"（视觉模型）的错,还是"手"（动作模型）的错?</li>
+                <li>多模态 agent 比纯文本 agent,难度上到底差在哪里——真的只是"多喂了一张图"这么简单?</li>
+                <li>如果 agent 在"看"一个网页截图时,页面里藏着一句专门写给 AI 看的指令,谁该为 agent 上钩负责?</li>
+            </ul>
+            <p>这些问题背后,都指向同一件事:<strong>"能看见"和"能看懂"和"能行动"之间,隔着好几层没被讨论清楚的工程鸿沟</strong>。这正是多模态智能体这个方向要解决的核心问题。</p>
+            <h2 id="zuobiao">坐标</h2>
+            <p>多模态智能体位于 Frontier 专题第 8 篇,是"给 agent 装上眼睛和手"这条线的核心。它的位置可以这样画:</p>
+            <pre><code>纯文本 Agent 闭环:
+  用户目标 → LLM 规划 → 调用工具(API/代码) → 文本结果 → 继续规划 → ...
+
+多模态 Agent 闭环:
+  用户目标 → LLM 规划
+      ↓
+  [截图/摄像头帧] → 视觉编码 → grounding(定位坐标/元素)
+      ↓
+  决定动作(click/type/scroll/抓取角度)
+      ↓
+  执行动作 → 世界状态改变
+      ↓
+  重新截图/重新感知 ← ———— 闭环回到这里,而不是直接拿"文本结果"</code></pre>
+            <p>跟已发布内容的边界,必须先说清楚,否则很容易混着讨论:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th aria-hidden="true">　</th>
+                        <th>概念</th>
+                        <th>讲的是什么</th>
+                        <th>跟本文的区别</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Foundation·Multimodal</td>
+                        <td>模型<strong>内部</strong>怎么处理多种模态输入——视觉编码器、跨模态对齐、统一 tokenization</td>
+                        <td>讲的是"模型能不能看懂",是能力的底座</td>
+                    </tr>
+                    <tr>
+                        <td>本文·Multimodal Agent</td>
+                        <td>把"看懂"接到<strong>行动</strong>上——grounding、闭环感知-决策-执行、动作空间设计</td>
+                        <td>讲的是"看懂之后怎么用来做事",是应用形态</td>
+                    </tr>
+                    <tr>
+                        <td>Application·Agent Engineering</td>
+                        <td>agent 的<strong>生产工程</strong>范式——工具调用、状态管理、错误恢复</td>
+                        <td>讲的是纯文本/结构化输入下的 agent 落地范式,不特别处理视觉闭环的特殊性</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·Agent Memory</td>
+                        <td>agent 跨次运行<strong>记住什么</strong></td>
+                        <td>跟本文正交——多模态 agent 一样需要记忆,但记忆机制不是本文重点</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一句话区分:Foundation 的 Multimodal 决定了 agent 有没有"视力",本文决定了这双眼睛怎么跟"手"配合把事情做成。</p>
+            <h2 id="why">为什么不能用更简单的方案</h2>
+            <h3>方案一:纯 DOM/无障碍树解析,不用截图</h3>
+            <p>网页/APP 界面本身自带结构化信息(DOM 树、accessibility tree),理论上比截图更精确、更省 token。但致命问题是:大量真实界面是 canvas 渲染、Flash 遗留系统、自定义控件,根本没有可读的 DOM;而且 DOM 结构和视觉呈现经常不一致(比如一个按钮在 DOM 里排第 5 个,视觉上却在页面最上方),依赖 DOM 会让 agent 在"人眼看到的世界"和"程序读到的世界"之间产生错位。</p>
+            <h3>方案二:模块化流水线——感知模型 + 独立规划器 + 独立动作头</h3>
+            <p>把"看图"、"想怎么做"、"具体怎么动"拆成三个独立训练的模型,分别调优,听起来更可控。但每多一个模块接口,就多一次信息损耗:视觉模型输出的自然语言描述("屏幕左上角有个红色按钮")到了规划器手里已经丢失了精确坐标,规划器的指令("点这个按钮")到了动作头手里又要重新猜坐标。三段式流水线的误差是逐级放大的,而不是线性叠加的。</p>
+            <h3>方案三:固定脚本 / RPA(机器人流程自动化)</h3>
+            <p>针对某个具体界面写死坐标和步骤,不需要任何"理解",执行起来又快又准。但只要界面改版、弹窗位置变化、分辨率不同,脚本立刻失效,而且完全没有泛化能力——本质上不是智能体,是自动化宏。多模态 agent 存在的意义,恰恰是解决 RPA 解决不了的"界面一变就失灵"问题。</p>
+            <p>💡 三条路都在同一个地方摔倒:<strong>把"看见"和"精确定位再行动"当成同一种能力</strong>,而它们其实是两种需要分别训练、分别验证的能力。</p>
+            <h2 id="how">怎么工作</h2>
+            <p>不讲公式,讲一个类比:多模态 agent 更像一个<strong>"戴着摄像头、蒙着眼罩,只能靠拍照确认现状"的远程操作员</strong>,而不是一个能持续看视频流的正常人。</p>
+            <p>它的每一步循环是这样的:</p>
+            <ol>
+                <li><strong>拍照</strong>:截一张当前屏幕/场景的照片(离散的一帧,不是连续视频)</li>
+                <li><strong>看懂画面 + 定位坐标</strong>(grounding):不只是"这是个按钮",而是"这个按钮的像素坐标在 (823, 412)"——这一步是整个链路里最容易翻车的环节,因为"识别出物体"和"精确指出它在哪"是两种不同难度的能力,近视的人也能看出前面有张桌子,但未必能准确说出桌子边缘离自己多远</li>
+                <li><strong>决定动作</strong>:点击、输入文字、滚动,或者对机器人来说是"手腕转多少度、手指合拢到什么程度"</li>
+                <li><strong>执行</strong>:动作发出后,世界状态真的改变了(网页跳转了、物体被碰到了)</li>
+                <li><strong>重新拍照确认</strong>:因为是离散抽样式的"看",agent 必须主动回去再看一眼才知道动作有没有生效,而不能像正常视觉一样自动感知到变化</li>
+            </ol>
+            <p>这个"看一眼→做一步→再看一眼"的节奏,跟纯文本 agent"调用工具→拿到返回值→继续"的节奏,表面像,但多模态版本多了两个纯文本世界不存在的问题:<strong>世界会在两次拍照之间悄悄漂移</strong>(比如网页加载了新内容、物体被风吹动了),以及<strong>每次"看"的成本(图像 token)远高于纯文本工具返回值</strong>,这两点直接决定了多模态 agent 的架构不能照抄纯文本 agent 的架构。</p>
+            <h2 id="impact">翻车现场</h2>
+            <h3>案例一:被过度期待的"动作模型"</h3>
+            <p>2024 年初有一款主打"看懂 App 界面并自动操作"的 AI 硬件设备上市,发布时演示效果惊艳,号称能理解任意界面并执行任务。上市后独立拆解和实测发现,大量宣传中的"通用操作能力"实际上是针对少数几个热门 App 预先适配、走的是接近脚本化的路径,而不是通用视觉 grounding 在起作用。根因在于:<strong>"能在演示视频里跑通"和"具备通用的界面 grounding 能力"是两件完全不同的事</strong>,前者可以靠精心挑选场景和大量人工适配伪装成后者,但一旦遇到没被专门适配过的界面就立刻露馅。这提醒我们评估多模态 agent 时,必须用大量未见过的界面去测试 grounding 泛化能力,不能只看几个精心准备的 demo。</p>
+            <h3>案例二:截图里的"隐形指令"</h3>
+            <p>计算机操作类 agent(能自主截图、点击、输入的那类)面临一个纯文本 agent 不太会遇到的攻击面:恶意网页可以在视觉上"看起来正常",但在页面里嵌入专门写给 AI 看的文字或图案(比如极小字号的隐藏文本、伪装成系统弹窗的图片),诱导 agent 把这些内容当成合法指令去执行——这类风险在计算机操作类 agent 的安全评估中已被反复提及,是行业公认需要专门防范的一类问题。根因是:agent 把"渲染出来的像素"和"用户下达的指令"混为一谈,而视觉输入天生比纯文本更难做可信度过滤——一段文字可以简单标记"这是网页内容不是用户指令",但一张图片里哪部分是"内容"哪部分是"指令",没有天然的边界符可用。</p>
+            <h3>案例三:实验室能抓、现场抓空</h3>
+            <p>视觉-语言-动作(VLA)模型驱动的机器人,在训练数据覆盖的场景里(固定光照、固定背景、固定物体摆放方式)抓取成功率很高,但换一个光照角度、换一个没见过的物体形状、甚至只是把桌布换个颜色,抓取成功率就会明显下滑。根因在于 grounding 环节学到的往往是训练分布里的<strong>统计捷径</strong>(比如"这类物体通常在画面这个位置"),而不是真正鲁棒的空间理解——这也是具身智能领域长期讨论的"sim-to-real gap"和分布外泛化问题的具体体现之一。</p>
+            <h2 id="engineering">为什么开发者要懂</h2>
+            <p>理解多模态 agent 的闭环结构,能帮你把已发布的其他文章串起来看:</p>
+            <ul>
+                <li>跟 <strong>Foundation·Multimodal</strong> 的关系:那篇讲的视觉编码质量,直接决定了本文第 3 节"看懂画面"这一步的天花板——编码器本身分辨率不够、位置信息丢失,grounding 无论怎么优化都补不回来。</li>
+                <li>跟 <strong>Application·Agent Engineering</strong> 的关系:多模态 agent 依然是一种 agent,一样需要错误恢复、状态管理这些工程范式,但它的"工具调用"多了一种特殊形态——每次调用都伴随一次重新感知,这对 Harness 层的设计(尤其是上下文该塞多少张历史截图)提出了纯文本 agent 没有的额外约束。</li>
+                <li>跟 <strong>Frontier·MCTS/Tree Search</strong> 的关系:当动作空间是连续坐标(点哪个像素)而不是离散选项时,搜索/规划的方式必须跟着变,不能直接套用离散动作空间下的树搜索思路。</li>
+                <li>跟 <strong>Frontier·RLVR</strong> 的关系:grounding 准确率(点没点对地方)是一种天然可验证的奖励信号,这也是为什么用强化学习训练点击/操作类模型近年来进展明显。</li>
+            </ul>
+            <h2 id="wuqu">常见误区</h2>
+            <p><strong>误区:模型能看图说话,就等于能当多模态 agent 用。</strong> 真相:"描述图片里有什么"和"精确指出某个元素的像素坐标并据此下达可执行动作"是两种难度、需要分别评测的能力,前者做得好完全不保证后者做得好。</p>
+            <p><strong>误区:多模态 agent 就是文本 agent 加一次视觉 API 调用。</strong> 真相:一旦引入"动作会改变世界、必须重新感知才知道结果"的闭环,上下文管理、延迟预算、成本结构都要重新设计,不是往现有 agent 架构里插一个视觉工具那么简单。</p>
+            <p><strong>误区:只要用更高分辨率的图像输入,坐标定位问题就能解决。</strong> 真相:grounding 是一种需要专门数据(比如大量"图片+坐标标注"对)训练出来的技能,分辨率只是必要条件之一,不是充分条件——很多高分辨率模型依然定位不准,因为训练数据里缺乏坐标级别的监督信号。</p>
+            <p><strong>误区:视觉输入比文字更"客观",不容易被诱导。</strong> 真相恰恰相反:文字天然可以用系统提示词、角色标记等方式区分"用户指令"和"外部内容",而一张截图里,哪部分是页面内容、哪部分可能是精心设计的诱导性视觉元素,目前没有可靠的自动边界判定方法,这使得视觉输入在某些场景下反而是更脆弱的攻击面。</p>
+            <h2 id="jieyu">总结</h2>
+            <p><strong>给小白的话</strong>:让 AI"看得见"和让 AI"能照着看到的东西把事情做对",中间还有一大段路要走,这段路才是多模态智能体真正要解决的问题。</p>
+            <p><strong>给开发者的话</strong>:设计多模态 agent 时,永远把 grounding(精确定位)和 perception(内容理解)当成两个要分别评测的能力,并且默认视觉输入是不可信输入源,需要单独设计防注入的边界。</p>
+            <p>💡 一句话金句:<strong>看得见不等于看得懂,看得懂不等于打得中。</strong> <em>(Seeing isn't understanding, and understanding isn't the same as acting on target.)</em></p>
+            <p><strong>参考资料方向</strong>(仅列研究方向,不编造具体论文/文档链接):视觉-语言-动作(VLA)模型的具身智能研究;计算机操作类 agent 的 GUI grounding 数据集与评测方法;多模态大模型的 prompt injection / 视觉侵入式攻击安全研究;sim-to-real 泛化差距相关的机器人学习文献。</p>
+
+            <nav class="article-nav">
+                <a href="agent-memory.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🧷 Agent Memory</span>
+                    </span>
+                </a>
+                <a href="a2a.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🤝 A2A</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：未包裹的 table 自动套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
