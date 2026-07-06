@@ -15,6 +15,7 @@
             <a href="application.html" class="active">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
             <a href="../frontier/frontier.html">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -35,6 +36,7 @@
                 <a href="application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
                 <a href="../foundation/foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
                 <a href="../frontier/frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
+                <a href="../local-ai-engineering/Local-AI-Engineering.html" class="sidebar-item" title="Local AI Engineering"><span class="icon">🖥️</span><span class="text">Local AI Engineering</span></a>
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">📚 本专题文章</h3>
@@ -154,6 +156,7 @@
         sideBtn.addEventListener('click', function() {
             document.body.classList.toggle('sidebar-open');
             const on = document.body.classList.contains('sidebar-open');
+            sideBtn.classList.toggle('active');
             safeSet('sidebarOpen', on ? '1' : '0');
         });
     })();
