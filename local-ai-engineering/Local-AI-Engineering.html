@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<!-- Local AI Engineering 专题页：13 篇规划（部署 4 篇 + 微调 9 篇） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Engineering · kipozannaki</title>
+    <meta name="description" content="本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操，从跑起来到针对特定任务微调">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="local-ai-engineering.html" class="active">Local AI Engineering</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <section class="hero-compact">
+        <h1>Local AI Engineering</h1>
+        <p>本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操 · 规划 13 篇</p>
+    </section>
+
+    <div class="site-layout">
+        <aside class="sidebar">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="展开/收起导航" aria-label="展开或收起导航">›</button>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📂 专题</h3>
+                <a href="../application/application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
+                <a href="../foundation/foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
+                <a href="../frontier/frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
+                <a href="local-ai-engineering.html" class="sidebar-item" title="Local AI Engineering"><span class="icon">🖥️</span><span class="text">Local AI Engineering</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 集群一：部署</h3>
+                <a href="hardware-and-env.html" class="sidebar-item" title="硬件与环境选型"><span class="icon">🧰</span><span class="text">硬件与环境选型</span></a>
+                <a href="model-format-quantization.html" class="sidebar-item" title="模型格式与量化实践"><span class="icon">🗜️</span><span class="text">模型格式与量化实践</span></a>
+                <a href="local-inference-engines.html" class="sidebar-item" title="本地推理引擎全景"><span class="icon">⚙️</span><span class="text">本地推理引擎全景</span></a>
+                <a href="local-serving.html" class="sidebar-item" title="本地服务化部署"><span class="icon">📡</span><span class="text">本地服务化部署</span></a>
+            </div>
+            <div class="sidebar-group">
+                <h3 class="sidebar-title">📚 集群二：训练与微调</h3>
+                <a href="finetuning-methods.html" class="sidebar-item" title="微调方法选型"><span class="icon">🧩</span><span class="text">微调方法选型</span></a>
+                <a href="dataset-construction.html" class="sidebar-item" title="任务专属数据集构造实战"><span class="icon">🗂️</span><span class="text">数据集构造实战</span></a>
+                <a href="finetuning-toolchains.html" class="sidebar-item" title="微调工具链三平台对比"><span class="icon">🛠️</span><span class="text">微调工具链对比</span></a>
+                <a href="finetune-code-assistant.html" class="sidebar-item" title="实战一：代码助手微调"><span class="icon">💻</span><span class="text">实战一：代码助手</span></a>
+                <a href="finetune-domain-qa.html" class="sidebar-item" title="实战二：领域知识/客服问答微调"><span class="icon">💬</span><span class="text">实战二：领域问答</span></a>
+                <a href="finetune-extraction-classification.html" class="sidebar-item" title="实战三：结构化抽取与分类微调"><span class="icon">🏷️</span><span class="text">实战三：结构化抽取</span></a>
+                <a href="finetune-tool-calling.html" class="sidebar-item" title="实战四：工具调用能力微调"><span class="icon">🔧</span><span class="text">实战四：工具调用</span></a>
+                <a href="finetuning-evaluation.html" class="sidebar-item" title="微调效果评估"><span class="icon">🔍</span><span class="text">微调效果评估</span></a>
+                <a href="lora-merge-and-redeploy.html" class="sidebar-item" title="LoRA 合并与重新导出部署"><span class="icon">🔄</span><span class="text">合并与重新导出</span></a>
+            </div>
+        </aside>
+
+        <main>
+            <section class="section">
+                <h2>🖥️ 专题说明</h2>
+                <p>这一专题聚焦"单机场景"：不追求大规模服务化的极致吞吐，追求在一台 Mac / 一张显卡 / 一台笔记本上，把模型真的跑起来，并且针对具体任务微调到能用。内容分两个集群：</p>
+                <ul>
+                    <li><strong>部署</strong>　硬件选型 → 模型格式与量化 → 本地推理引擎 → 服务化部署，覆盖 Mac（统一内存 / Metal）、Linux（独立显存 / CUDA·ROCm，事实上的一等公民）、Windows（WSL2 绕路居多）三条不同起点</li>
+                    <li><strong>训练与微调</strong>　方法选型 → 数据集构造 → 工具链对比 → 四类实战场景（代码助手 / 领域问答 / 结构化抽取 / 工具调用）→ 效果评估 → 合并导出，形成"部署→微调→再部署"的完整闭环</li>
+                </ul>
+                <p class="note"><strong>一个需要先说清楚的边界</strong>：AI系统工程专题（暂未开始）讲的是<strong>服务端/生产级推理引擎的机制原理</strong>——vLLM / SGLang 内部怎么做 continuous batching、PagedAttention 怎么省显存，面向大规模服务化场景。这里的 <strong>Local AI Engineering</strong> 讲的是<strong>单机/消费级硬件上的部署与微调实操</strong>——两者会共用一些底层概念（比如量化），但本专题只从"这台机器该选哪种格式、能不能跑得动、怎么针对我的任务微调"的实操角度切入，不重复讲算法内部原理。</p>
+            </section>
+
+            <section class="section">
+                <h2>📚 集群一：部署</h2>
+                <div class="articles-grid">
+                    <a href="hardware-and-env.html" class="article-card">
+                        <div class="article-icon">🧰</div>
+                        <h3>硬件与环境选型</h3>
+                        <p>同样是"能跑本地模型"，Mac 的统一内存、Linux 的独立显存、Windows 的 WSL2 绕路，起点差在哪？一篇讲清三大平台的算力和生态前提，决定后面所有选择的上限。</p>
+                    </a>
+                    <a href="model-format-quantization.html" class="article-card">
+                        <div class="article-icon">🗜️</div>
+                        <h3>模型格式与量化实践</h3>
+                        <p>同一个模型，GGUF、MLX、GPTQ/AWQ/EXL2 该选哪个？一篇讲清格式和量化方案在你这台机器上到底跑不跑得动，而不是纠结算法内部怎么算误差补偿。</p>
+                    </a>
+                    <a href="local-inference-engines.html" class="article-card">
+                        <div class="article-icon">⚙️</div>
+                        <h3>本地推理引擎全景</h3>
+                        <p>llama.cpp、Ollama、LM Studio、MLX-LM、vLLM 本地模式，谁在哪个平台是"一等公民"、谁是"能用但要自己填坑"？一篇讲清怎么选。</p>
+                    </a>
+                    <a href="local-serving.html" class="article-card">
+                        <div class="article-icon">📡</div>
+                        <h3>本地服务化部署</h3>
+                        <p>模型跑起来之后，怎么包成一个常驻 API 让其他程序调用？一篇讲清三大平台的容器化、进程管理和开机自启差异。</p>
+                    </a>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>📚 集群二：训练与微调</h2>
+                <div class="articles-grid">
+                    <a href="finetuning-methods.html" class="article-card">
+                        <div class="article-icon">🧩</div>
+                        <h3>微调方法选型</h3>
+                        <p>全参数、LoRA、QLoRA、Adapter，本地资源约束下哪些理论可行、哪些算力门槛直接劝退你？一篇讲清怎么选。</p>
+                    </a>
+                    <a href="dataset-construction.html" class="article-card">
+                        <div class="article-icon">🗂️</div>
+                        <h3>任务专属数据集构造实战</h3>
+                        <p>"我想让模型做 X"要怎么翻译成可训练样本？指令对、领域 QA、function-calling 格式、分类/抽取标注，每种任务的数据形态都不一样。</p>
+                    </a>
+                    <a href="finetuning-toolchains.html" class="article-card">
+                        <div class="article-icon">🛠️</div>
+                        <h3>微调工具链三平台对比</h3>
+                        <p>peft、unsloth、axolotl、LlamaFactory、MLX-LM 微调，同一套代码在 Mac 上跑不跑得动，Windows 是不是必须切 WSL2？</p>
+                    </a>
+                    <a href="finetune-code-assistant.html" class="article-card">
+                        <div class="article-icon">💻</div>
+                        <h3>实战一：代码助手微调</h3>
+                        <p>数据量级、方法选择、平台可行性三件套，针对"让模型更懂我的代码风格/框架"这个具体任务逐一讲透。</p>
+                    </a>
+                    <a href="finetune-domain-qa.html" class="article-card">
+                        <div class="article-icon">💬</div>
+                        <h3>实战二：领域知识/客服问答微调</h3>
+                        <p>把一堆领域文档和历史问答，变成能让模型"说话像内部专家"的训练数据，本地能不能练出来？</p>
+                    </a>
+                    <a href="finetune-extraction-classification.html" class="article-card">
+                        <div class="article-icon">🏷️</div>
+                        <h3>实战三：结构化抽取与分类微调</h3>
+                        <p>让模型稳定输出固定格式的抽取/分类结果，比"聊得像"更看重精度和一致性，数据和评估方式都要重新设计。</p>
+                    </a>
+                    <a href="finetune-tool-calling.html" class="article-card">
+                        <div class="article-icon">🔧</div>
+                        <h3>实战四：工具调用能力微调</h3>
+                        <p>让本地小模型学会稳定地按格式发起工具调用，是四类场景里最容易"看起来学会了、实际一碰就崩"的一类。</p>
+                    </a>
+                    <a href="finetuning-evaluation.html" class="article-card">
+                        <div class="article-icon">🔍</div>
+                        <h3>微调效果评估：没有云端评测集群时怎么办</h3>
+                        <p>本地怎么构造小规模测试集？怎么分辨"真学会了新任务"还是"过拟合到了训练集的语气"？常见的自我欺骗式评估陷阱。</p>
+                    </a>
+                    <a href="lora-merge-and-redeploy.html" class="article-card">
+                        <div class="article-icon">🔄</div>
+                        <h3>LoRA 合并与重新导出部署</h3>
+                        <p>微调完的 adapter 怎么合并回底座模型，再转回 GGUF/MLX 重新部署？闭环回到集群一，"部署→微调→再部署"就此循环闭合。</p>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+
+    <script>
+    (function() {
+        const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级 */ } };
+
+        const savedTheme = safeGet('theme');
+        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (sysDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        if (safeGet('reading') === '1') document.body.classList.add('reading-mode');
+        if (safeGet('sidebarOpen') === '1') document.body.classList.add('sidebar-open');
+
+        const themeBtn = document.getElementById('theme-toggle');
+        const readBtn = document.getElementById('reading-toggle');
+        const sideBtn = document.getElementById('sidebar-toggle');
+        if (theme === 'dark') themeBtn.classList.add('active');
+        if (document.body.classList.contains('reading-mode')) readBtn.classList.add('active');
+
+        themeBtn.addEventListener('click', function() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            themeBtn.classList.toggle('active');
+            safeSet('theme', next);
+        });
+        readBtn.addEventListener('click', function() {
+            document.body.classList.toggle('reading-mode');
+            const on = document.body.classList.contains('reading-mode');
+            readBtn.classList.toggle('active');
+            safeSet('reading', on ? '1' : '0');
+        });
+        sideBtn.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-open');
+            const on = document.body.classList.contains('sidebar-open');
+            sideBtn.classList.toggle('active');
+            safeSet('sidebarOpen', on ? '1' : '0');
+        });
+    })();
+    </script>
+</body>
+</html>
