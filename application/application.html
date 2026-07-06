@@ -36,7 +36,6 @@
                 <a href="application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
                 <a href="../foundation/foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
                 <a href="../frontier/frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
-                <a href="../local-ai-engineering/Local-AI-Engineering.html" class="sidebar-item" title="Local AI Engineering"><span class="icon">🖥️</span><span class="text">Local AI Engineering</span></a>
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">📚 本专题文章</h3>
@@ -126,7 +125,7 @@
         // 用 safeSet/safeGet 包装后，单点失败不会击穿整个 IIFE，
         // 主题/阅读模式/侧边栏的开关功能不会因此完全失灵
         const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
-        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级：不阻塞当前页交互 */ } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级 */ } };
 
         const savedTheme = safeGet('theme');
         const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
