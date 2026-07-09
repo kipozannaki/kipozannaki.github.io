@@ -6,6 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Frontier & Emerging Research · kipozannaki</title>
     <meta name="description" content="AI 前沿研究：推理范式、Test-Time Compute、Agent 记忆与协作协议">
+    <!-- 跨页主题恢复：文章页/其他专题页切换主题后跳到本专题页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -98,7 +109,7 @@
                         <p>为什么训练推理模型不用人类偏好打分，改用"答案对不对"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
                     </a>
                     <a href="world-model.html" class="article-card">
-                        <div class="article-icon">🌍</div>
+                        <div class="article-icon">🌌�</div>
                         <h3>World Model</h3>
                         <p>为什么生成一段逼真的视频，不代表模型真的理解物理规律？一篇讲清"世界模型"这个概念在讨论什么，以及为什么这个问题目前还没有定论。</p>
                     </a>
@@ -169,7 +180,6 @@
         sideBtn.addEventListener('click', function() {
             document.body.classList.toggle('sidebar-open');
             const on = document.body.classList.contains('sidebar-open');
-            sideBtn.classList.toggle('active');
             safeSet('sidebarOpen', on ? '1' : '0');
         });
     })();
