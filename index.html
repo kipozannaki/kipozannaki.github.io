@@ -7,6 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>kipozannaki · AI 主题内容站</title>
     <meta name="description" content="LLM 应用工程体系与 AI 基础算法的实战笔记与沉淀">
+    <!-- 跨页主题恢复：专题页/文章页切换主题后跳到首页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -37,6 +48,7 @@
                 <a href="application/application.html" class="sidebar-item" title="Application & Orchestration"><span class="icon">📦</span><span class="text">Application</span></a>
                 <a href="foundation/foundation.html" class="sidebar-item" title="Foundation & Core Algorithms"><span class="icon">🧬</span><span class="text">Foundation</span></a>
                 <a href="frontier/frontier.html" class="sidebar-item" title="Frontier & Emerging Research"><span class="icon">🔭</span><span class="text">Frontier</span></a>
+                <a href="local-ai-engineering/Local-AI-Engineering.html" class="sidebar-item" title="Local AI Engineering"><span class="icon">🖥️</span><span class="text">Local AI Engineering</span></a>
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">🔗 站内导航</h3>
@@ -106,7 +118,7 @@
                     <div class="topic-icon">🖥️</div>
                     <div class="topic-info">
                         <h3>Local AI Engineering</h3>
-                        <p>本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操——硬件选型 / 格式量化 / 推理引擎 / 服务化部署 / 微调方法 / 数据集构造 / 工具链对比 / 4 类实战场景。规划 13 篇。</p>
+                        <p>本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操——硬件选型 / 格式量化 / 推理引擎 / 服务化部署 / 微调方法 / 数据集构造 / 工具链对比 / 4 类实战场景。已上线 3 篇，规划 13 篇。</p>
                         <span class="topic-cta">进入专题 →</span>
                     </div>
                 </a>
