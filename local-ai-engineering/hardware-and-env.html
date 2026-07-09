@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!-- 文章页：🧰 硬件与环境选型（由 .md 自动生成的 HTML，请勿手工编辑） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧰 硬件与环境选型 · kipozannaki</title>
+    <meta name="description" content="Mac / Linux / Windows 三条起点 · 双栖科普">
+    <!-- 跨页主题恢复：local-ai-engineering 专题页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="Local-AI-Engineering.html" class="active">Local AI Engineering</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧰 硬件与环境选型</h1>
+            <p class="meta">Mac / Linux / Windows 三条起点 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#yinyan">一、引言</a> · <a href="#duizhao">二、三平台对照</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#gongzuo">四、怎么工作</a> · <a href="#fanche">五、翻车现场</a> · <a href="#kaiyao">六、为什么开发者要懂</a> · <a href="#wuhu">七、常见误区</a> · <a href="#zongjie">八、总结</a></p>
+
+<h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来简单、实际上没那么简单的问题:</p>
+            <ul><li>"统一内存"听起来比"独立显存"更大方,是不是意味着 Mac 天生更适合跑本地大模型?</li><li>同样标着 24GB,NVIDIA 显卡的 24GB 和 Mac 的 24GB 统一内存,能干的事一样吗?</li><li>Windows 明明是装机量最大的桌面系统,为什么本地大模型的教程十篇里九篇都在默认你用 Linux 或者 WSL2?</li><li>显卡参数表上最抓眼球的是算力(TFLOPS),但真正决定你能不能跑动一个模型的,是另一个数字——这个数字是什么?</li><li>2026 年买机器这件事,还多了一个跟三年前完全不一样的变量——这个变量甚至不是技术问题。</li></ul>
+            <p>这些问题背后,指向同一件事:<strong>"能不能跑起来"这件事,90% 是由内存/显存容量和带宽决定的,剩下 10% 才是关于算力</strong>,而绝大多数人第一次做硬件预算时,恰恰把这个优先级搞反了。</p>
+            <h2 id="duizhao">二、三平台对照</h2>
+            <p>不画流程图,直接上一张三平台对照表——这张表决定了后面所有文章要不要针对某个平台单独讲一段。</p>
+            <table><thead><tr><th>维度</th><th>Mac(Apple Silicon)</th><th>Linux + NVIDIA/AMD</th><th>Windows</th></tr></thead><tbody><tr><td>内存/显存模型</td><td>统一内存(Unified Memory):CPU/GPU/神经网络引擎共享同一块物理内存池,系统内存等于"显存"</td><td>独立显存(VRAM):显卡有自己专属的高带宽内存,跟系统内存分开</td><td>跟 Linux 一样是独立显存,硬件层面没有区别</td></tr><tr><td>2026 年中典型配置</td><td>M3 Ultra Mac Studio(最高 256GB,曾因供应链问题一度下架高配选项)、M5 Max 已进入 MacBook Pro(最高 128GB,带宽 460-614GB/s)</td><td>RTX 5090(32GB GDDR7,1792GB/s,消费级旗舰)、RTX 4090(24GB)、AMD RX 7900XTX(24GB,ROCm 7.x 下已经比较稳定)</td><td>硬件跟 Linux 完全一样,软件生态是主要差异点</td></tr><tr><td>软件生态成熟度</td><td>依赖 MLX(苹果官方)和 llama.cpp 的 Metal 后端,官方支持但生态规模小于 CUDA</td><td>CUDA 是事实标准,几乎所有开源推理/微调工具第一顺位适配的就是"Linux + CUDA";AMD ROCm 在改善但仍是第二梯队</td><td>原生 Windows 能装 CUDA,但很多工具(尤其是需要编译扩展的微调工具链)默认假设 Linux 环境,Windows 用户常年被建议"装个 WSL2"</td></tr><tr><td>典型翻车点</td><td>统一内存看起来够大,实际可用量会被系统和后台应用吃掉一部分</td><td>驱动版本 / CUDA Toolkit 版本 / PyTorch build 三者要精确匹配,升级驱动经常把环境搞挂</td><td>WSL2 里访问 Windows 盘(<code>/mnt/c/...</code>)的 I/O 有明显损耗,GPU 直通配置不对会悄悄退化成 CPU 推理</td></tr><tr><td>2026 年新变量</td><td>全球 DRAM 缺货推高价格、部分高内存配置一度下架或延期</td><td>消费级显卡涨价明显,街价常年高于官方指导价</td><td>同上,硬件受同一波缺货影响</td></tr><tr><td>值得关注的新选项</td><td>——</td><td>AMD Strix Halo(Framework Desktop 等,128GB 统一内存,把"统一内存"这个优势从苹果专属变成了一个品类) / NVIDIA DGX Spark(128GB 统一内存,专门面向本地 AI 工作站)</td><td>同左,Strix Halo/DGX Spark 都是 x86/Windows 生态可以选的机型</td></tr></tbody></table>
+            <p>一句话总结这张表:<strong>Mac 的优势是"内存池子大、买得起";独立显存的优势是"带宽快、生态成熟";Windows 的短板不在硬件,在软件适配的顺位排在后面</strong>。</p>
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+            <h3>方案一:只看参数表上的算力(TFLOPS)选硬件</h3>
+            <p>算力数字很显眼,但本地大模型推理这件事,瓶颈几乎总是"内存带宽",不是算力——模型的计算量对于现代芯片来说通常不是问题,真正卡住速度的是"每生成一个 token,要把多少数据从内存搬到计算单元里"。这也是为什么同样标着高算力的芯片,内存带宽差一倍,实际推理速度可能差好几倍。只看算力选硬件,买回来大概率是"跑得动但慢得难受"。</p>
+            <h3>方案二:哪个便宜就买哪个,反正模型可以量化</h3>
+            <p>量化确实能把模型塞进更小的内存/显存里,但量化不是免费的——精度会打折,而且量化到多低还能用,跟具体任务强相关(代码生成对精度的容忍度和闲聊对话完全不一样)。把"预算不够"完全甩给"量化来救",往往会在真正需要精度的任务上栽跟头,量化应该是精心选择的手段,不是预算不够时的兜底借口。</p>
+            <h3>方案三:直接照抄别人的"配置清单",不管自己的任务</h3>
+            <p>网上一大堆"2026 本地大模型硬件推荐榜",但那些榜单默认的场景往往是"跑现成模型对话",跟"我要微调一个专属任务模型"是完全不同的资源需求——微调对显存的要求通常是推理的 3-4 倍(梯度、优化器状态、激活值都要占地方),照抄一份只考虑推理的配置清单,到了微调阶段大概率不够用。</p>
+            <p>💡 三条路都在同一个地方摔倒:<strong>把硬件选型简化成了一个单一数字的排序题,而实际上它是"内存容量 × 内存带宽 × 你的具体任务(推理还是微调)"这三个维度的联合决策</strong>。</p>
+            <h2 id="gongzuo">四、怎么工作</h2>
+            <p>不讲芯片架构细节,讲几个类比。</p>
+            <p><strong>统一内存,像是一个所有人共用的大仓库</strong>。CPU、GPU、神经网络引擎不用各自搬一份货到自己家里,直接在同一个仓库里取货——好处是仓库可以造得很大(苹果现在做到过 256GB 甚至测试到 768GB),坏处是这个仓库同时要伺候好几个"部门"抢着用,操作系统和后台应用也在这个仓库里占地方,你买的内存标称多少,不代表推理时真能用到那么多。</p>
+            <p><strong>独立显存,像是显卡自己专属的一个小仓库,但送货速度极快</strong>。这个仓库不跟别人共享,专供 GPU 一家使用,而且传送带(内存带宽)通常比统一内存更快——RTX 5090 的带宽接近 1800GB/s,是目前 Mac 最高配置的三倍左右。代价是仓库容量有上限,想要更大就得多花钱换更贵的型号,或者接受"模型太大装不进去"的现实。</p>
+            <p><strong>Windows 上的 WSL2,像是在 Windows 房子里搭了一个 Linux 的临时帐篷</strong>。帐篷里的软件生态跟正牌 Linux 一样,但帐篷和房子之间的"门"(文件系统跨界访问、GPU 直通配置)存在摩擦——东西放在帐篷里最快,放在房子的柜子里(C 盘)通过门搬进搬出,会有明显损耗。</p>
+            <p><strong>微调比推理更"吃仓库",因为多了两类额外货物</strong>。推理只需要把模型权重摆进仓库;微调还要额外堆放梯度(计算出来的调整方向)和优化器状态(记录调整历史的账本),这两类货物加起来通常是模型权重本身的 2-3 倍体积,这就是为什么"能推理"和"能微调"往往需要完全不同量级的硬件预算。</p>
+            <h2 id="fanche">五、翻车现场</h2>
+            <h3>案例一(Mac):统一内存不是"独享"内存</h3>
+            <p>有人冲着"苹果统一内存大"买了入门配置(比如 8GB 或 16GB 机型),想着"反正是统一内存,肯定够跑个大模型"。结果加载一个中等大小的量化模型后,系统本身、浏览器、聊天软件这些后台常驻应用已经占用了大头可用内存,推理进程一启动就开始跟系统抢内存、触发内存交换(swap),推理速度从"能用"直接掉到"卡到没法用"。根因是:<strong>"统一内存总容量"和"推理时真正可用的内存"之间有一段被操作系统和后台应用吃掉的差距</strong>,预算入门配置时必须按"总容量打七八折"来估算,不能按标称数字直接规划。2026 年这个坑还多了一层:全球 DRAM 缺货导致部分高内存配置一度停售或者被限购,想临时加内存升级的选项可能压根买不到。</p>
+            <h3>案例二(Linux):一次系统更新,环境全崩</h3>
+            <p>在 Linux 上通过系统包管理器(比如 <code>apt upgrade</code>)顺手升级了 NVIDIA 驱动,结果新驱动版本跟之前装好的 CUDA Toolkit 版本不匹配,已经装好的 PyTorch(编译时绑定了特定 CUDA 版本)直接报错找不到可用的 GPU,或者更隐蔽的情况是"能跑但跑起来比之前慢很多",因为悄悄退回了兼容模式。根因是:<strong>驱动、CUDA Toolkit、深度学习框架三者的版本必须精确匹配,而系统包管理器的"升级"逻辑完全不知道这层依赖关系</strong>,这也是为什么严肃做本地部署/微调的人普遍推荐用虚拟环境或容器把版本锁死,而不是依赖系统级别的自动更新。</p>
+            <h3>案例三(Windows):装了 CUDA,却在编译这一步卡住</h3>
+            <p>在 Windows 上装好了官方 CUDA Toolkit,兴冲冲想跑一个微调工具链,结果这个工具依赖的某个加速库需要在本机编译(常见于一些需要底层优化算子的库),而这类库的编译脚本、路径处理逻辑大多是按 Linux 环境写的,在原生 Windows 上编译报出一堆跟符号链接、路径分隔符相关的错误。被迫切换到 WSL2 之后,又踩进第二个坑:把模型文件仍然放在 Windows 的 C 盘,WSL2 通过 <code>/mnt/c/...</code> 这条路径访问时,文件读写要经过一层转译,I/O 速度明显下降,加载一个大模型文件的时间比放在 WSL2 自己的文件系统里慢上不少。更隐蔽的是 GPU 直通如果没配置对(比如 WSL 版本、驱动版本没对齐官方要求的组合),推理会悄悄退化成纯 CPU 计算,而且往往没有明显报错提示,只有"为什么这么慢"的困惑。根因是:<strong>Windows 原生环境和 WSL2 环境是两套独立的文件系统和执行环境,数据放错地方、GPU 配置没对齐,都不会报出"你选错平台了"这种直白的错误,只会体现为莫名其妙的性能下降</strong>。</p>
+            <h2 id="kaiyao">六、为什么开发者要懂</h2>
+            <p>这篇是整个 Local AI Engineering 专题的地基,后面每一篇都会回头引用这里的结论:</p>
+            <ul><li>跟<strong>下一篇·模型格式与量化实践</strong>的关系:选完硬件之后,"这台机器该用 GGUF 还是 MLX 格式"直接取决于这里确定的平台(Mac 用 MLX 生态有天然优势,GGUF 在三个平台上都能跑但各自性能不同)。</li><li>跟<strong>本地推理引擎全景</strong>的关系:同一个推理引擎在不同平台上的"一等公民"地位不一样——这篇的三平台对照表,就是那篇选引擎时的前提条件。</li><li>跟<strong>集群二·微调方法选型</strong>的关系:案例里提到的"微调比推理更吃仓库",直接决定了同一台机器,能推理的模型规模和能微调的模型规模,往往不是一个量级,选硬件时如果目标是"以后要微调",预算就不能只按推理需求来打。</li></ul>
+            <h2 id="wuhu">七、常见误区</h2>
+            <p><strong>误区:统一内存标多少,推理时就能用多少。</strong>
+真相:操作系统和后台应用会先占掉一部分,入门配置(尤其是低配 8GB/16GB 机型)实际可用量可能只有标称值的六七成,规划预算时要按打折后的数字来算,不能按参数表直接规划。</p>
+            <p><strong>误区:算力(TFLOPS)越高,推理速度一定越快。</strong>
+真相:本地推理的瓶颈通常是内存带宽而不是算力,同代芯片里带宽差一倍,实际推理速度的差距往往比算力差距更直接体现出来——买硬件先看带宽,再看算力。</p>
+            <p><strong>误区:Windows 装了原生 CUDA,就等于跟 Linux 环境没差别了。</strong>
+真相:很多微调工具链依赖需要本机编译的加速库,这些库的编译流程大多默认 Linux 环境,原生 Windows 编译经常直接报错,这也是为什么行业内本地微调教程绝大多数默认你在用 Linux 或 WSL2。</p>
+            <p><strong>误区:配置清单上"能跑某个模型",就意味着这台机器也能微调它。</strong>
+真相:微调对内存/显存的需求通常是推理的 2-4 倍(梯度和优化器状态要额外占地方),一份只测过推理的配置清单,不能直接套用到"我要微调"这个场景上。</p>
+            <h2 id="zongjie">八、总结</h2>
+            <p><strong>给小白的话</strong>:选本地跑大模型的机器,先看内存/显存容量和带宽这两个数字,再看算力;如果以后想微调,预算要按"比推理需求再高出两三倍"来打底,而不是按刚好够推理来买。</p>
+            <p><strong>给开发者的话</strong>:Mac 的统一内存架构和独立显存架构不是"哪个更好"的问题,而是"你的任务更看重容量还是更看重速度和生态成熟度"的权衡;Windows 用户如果打算认真做本地微调,尽早规划好 WSL2 环境和文件存放位置,不要等编译报错了才发现问题。</p>
+            <p>💡 <strong>买硬件先问"仓库多大、传送带多快",再问"引擎马力多强"。</strong></p>
+            <p><em>(Ask how big the warehouse is and how fast the conveyor belt runs, before asking how powerful the engine is.)</em></p>
+            <p><strong>参考资料方向</strong>(仅列真实可查的方向,不编造具体链接):苹果官方关于 Apple Silicon 统一内存架构的技术说明;NVIDIA/AMD 官方显卡产品规格页面;llama.cpp、MLX 官方仓库中关于各平台后端支持情况的文档;WSL2 官方文档中关于 GPU 计算直通(CUDA on WSL)的配置说明。</p>
+            <p><strong>下一篇预告</strong>:模型格式与量化实践——硬件选好了,同一个模型换成 GGUF、MLX、GPTQ/AWQ/EXL2 这几种格式,在你这台机器上到底该怎么选。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="Local-AI-Engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">返回专题</span>
+                        <span class="nav-title">🖥️ Local AI Engineering</span>
+                    </span>
+                </a>
+                <a href="model-format-quantization.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">🗜️ 模型格式与量化实践</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="Local-AI-Engineering.html" class="back-link">← 返回 Local AI Engineering 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
