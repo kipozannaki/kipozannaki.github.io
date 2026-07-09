@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<!-- 文章页：🗜️ 模型格式与量化实践（由 .md 自动生成的 HTML，请勿手工编辑） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗜️ 模型格式与量化实践 · kipozannaki</title>
+    <meta name="description" content="GGUF / MLX / GPTQ / AWQ / EXL2 该选哪个 · 双栖科普">
+    <!-- 跨页主题恢复：local-ai-engineering 专题页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="Local-AI-Engineering.html" class="active">Local AI Engineering</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🗜️ 模型格式与量化实践</h1>
+            <p class="meta">GGUF / MLX / GPTQ / AWQ / EXL2 该选哪个 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#yinyan">一、引言</a> · <a href="#duizhao">二、五个选项对照</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#gongzuo">四、怎么工作</a> · <a href="#fanche">五、翻车现场</a> · <a href="#kaiyao">六、为什么开发者要懂</a> · <a href="#wuhu">七、常见误区</a> · <a href="#zongjie">八、总结</a></p>
+
+<h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来简单、实际上没那么简单的问题:</p>
+            <ul><li>都标着"4-bit 量化",为什么两个不同格式跑出来的回答质量能差出一截?</li><li>同一个模型,为什么有的版本在 Mac 上用得很顺,挪到 Linux 显卡上却要重新下载一份完全不一样的文件,而不是同一份文件直接能用?</li><li>量化位数越低、文件越小,是不是压缩比例越高就一定越划算?</li><li>"GGUF"和"AWQ"经常被放在同一张对比表里讨论,但这两个词说的其实不是同一类东西——是哪里不一样?</li><li>都 2026 年了,网上教程还有不少在提 GPTQ,这东西现在还值得学吗?</li></ul>
+            <p>这些问题背后,指向同一件事:<strong>"格式"和"量化算法"是两个经常被混着说、但其实完全正交的概念,选错了不是"效果差一点",而是"你的推理引擎根本读不懂这份文件"</strong>。</p>
+            <h2 id="duizhao">二、五个选项对照</h2>
+            <table><thead><tr><th>名称</th><th>是格式还是算法</th><th>主要跑在哪</th><th>典型工具链</th><th>2026 年中定位</th></tr></thead><tbody><tr><td><strong>GGUF</strong></td><td>自包含<strong>文件格式</strong>(权重+分词器+元数据打包成一个文件),内置 K-quant 混合精度量化</td><td>CPU/GPU 混合,三大平台通用,唯一"一份文件到处跑"的选项</td><td>llama.cpp / Ollama / LM Studio</td><td>本地个人使用场景的默认选择</td></tr><tr><td><strong>GPTQ</strong></td><td><strong>量化算法</strong>(基于校准数据集调整误差),权重存成标准 Hugging Face safetensors</td><td>Linux + NVIDIA,GPU-only</td><td>AutoGPTQ / ExLlama</td><td>加载更慢、同等位宽质量略逊于 AWQ,新部署基本不推荐,除非模型只有这一种量化版本</td></tr><tr><td><strong>AWQ</strong></td><td><strong>量化算法</strong>(激活感知,依据模型实际激活模式挑出"关键权重"重点保留精度)</td><td>Linux + NVIDIA,GPU-only,生产级</td><td>vLLM / TGI</td><td>2026 年 GPU 生产级推理的默认量化算法</td></tr><tr><td><strong>EXL2 / EXL3</strong></td><td>绑定专属运行时的<strong>格式</strong>,支持 2.0–8.0 bit 的精细可调位宽</td><td>Linux + NVIDIA,GPU-only</td><td>ExLlamaV2 / ExLlamaV3</td><td>想在固定显存容量里榨出最大模型规模时的选择</td></tr><tr><td><strong>MLX</strong></td><td>苹果官方<strong>格式</strong>,原生适配统一内存架构</td><td>仅 Apple Silicon</td><td>MLX-LM</td><td>Mac 上的原生首选,生态小于 CUDA 系但官方在持续投入</td></tr></tbody></table>
+            <p>一句话理解这张表:<strong>GGUF、EXL2、MLX 是"格式"(决定文件怎么打包、被哪个运行时读取);GPTQ、AWQ 是"算法"(决定怎么删精度)——两者是两条不同的轴,不是同一个排行榜上的选项</strong>。</p>
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+            <h3>方案一:随便下一个标"4-bit"的版本,不管具体是哪种格式/算法</h3>
+            <p>"4-bit"只说明了压缩到了多少位,没说明是<strong>怎么</strong>压缩的。GGUF 的 K-quant 是按层的重要性分配不同精度(重要层多留几位,次要层少留几位);AWQ 是先观察模型真实的激活模式,把对输出影响大的权重挑出来重点保护。同样标 4-bit,两种思路产出的实际质量可以有明显差距——只看位数不看方法,选出来的版本质量是开盲盒。</p>
+            <h3>方案二:图省心,永远选最高精度(Q8/FP16)</h3>
+            <p>高精度确实损失最小,但代价是文件体积和显存占用成倍增加,而多数场景下 Q8 相对 Q4_K_M 的质量提升在日常使用中很难察觉,复杂推理任务上差距才会明显拉开。对大多数本地场景,这种"图省心"的选择本质是拿显存空间换取一个用不上的精度余量,不划算。</p>
+            <h3>方案三:认准一个格式打天下,不管平台</h3>
+            <p>把 EXL2 文件搬到 Mac 上,你会发现根本没有对应的运行时可以读——ExLlama 系只支持 CUDA。反过来,把追求极致生产吞吐的场景硬套成 GGUF + llama.cpp,跟 AWQ + vLLM 的生产级方案比,吞吐量会有明显差距。格式选型必须先锚定"我在哪个平台、要用哪个引擎",不存在一个格式能覆盖所有场景。</p>
+            <p>💡 三条路都在同一个地方摔倒:<strong>把"选格式/算法"简化成了一个单一排行榜,而实际上这是"平台 × 引擎 × 任务对精度的敏感度"三者共同决定的选择</strong>。</p>
+            <h2 id="gongzuo">四、怎么工作</h2>
+            <p>不讲量化数学,讲几个类比。</p>
+            <p><strong>量化,像是把一本精装书压缩成口袋书</strong>。内容大体还在,但字号变小、用纸变薄,读起来会损失一些细节——损失多少,取决于"怎么删减",这正是不同量化方法的差别所在。</p>
+            <p><strong>GGUF 的 K-quant,像是给书里不同章节分配不同字号</strong>。目录、结论这类信息密度高的部分留大字号(高精度),正文里相对次要的部分用小字号(低精度)——这是一种"提前按经验判断哪里重要"的策略,不需要额外的校准步骤,打包完就能直接用。</p>
+            <p><strong>AWQ,像是先找几个读者试读,记录他们在哪些段落反复回看</strong>。不是凭经验猜哪里重要,而是让模型先"过一遍活儿"(用校准数据跑一遍激活模式),观察真实使用中哪些权重对输出影响最大,再针对性地保留这些权重的精度——这道"陪读"工序(校准)让 AWQ 通常比凭经验分配精度的方法更准,但也意味着量化过程本身多了一步,不是打包完直接搞定的。</p>
+            <p><strong>格式和算法是两件独立的事,类比"装订方式"和"删减策略"</strong>。GGUF 既是装订方式(文件格式)也自带一套删减策略(K-quant);AWQ 只是删减策略,删减完之后还要按标准的"装订方式"(safetensors)打包起来才能被 vLLM 这类引擎读取。理解这一层,就知道为什么"GGUF 还是 AWQ"这个问题问法本身就有点像在问"精装书还是好排版"——两者不是互斥选项,只是大多数教程习惯把它们放在同一张表里讨论,因为它们对应的是不同的平台生态。</p>
+            <h2 id="fanche">五、翻车现场</h2>
+            <h3>案例一:把 AWQ 模型塞进 Ollama,加载直接失败</h3>
+            <p>有人从模型仓库下载了一份 AWQ 量化的权重,想着"反正都是量化过的模型,应该能用 Ollama 加载"。结果发现 Ollama 底层基于 llama.cpp / GGUF 那一套体系,根本不认 AWQ 权重所在的 safetensors 结构,加载直接报错。根因是:<strong>AWQ 是算法不是格式,它产出的权重需要配合能读 safetensors 的引擎(比如 vLLM),硬塞进一个只认 GGUF 容器的工具,不是"效果差一点",而是压根打不开</strong>。</p>
+            <h3>案例二:为了多塞一个"专家"模型,选了过低的量化位数</h3>
+            <p>有人想在有限显存里同时跑两个模型,把其中一个原本该用 Q4_K_M 的模型降到了 Q2 来腾地方,拿去跑一个需要多步推理的复杂任务。结果发现模型经常在推理链条中间"断片"、给出不连贯甚至自相矛盾的结果,比换一个稍小但保持 Q4 精度的模型表现还差。根因是:<strong>量化位数往下压是有下限的,尤其是复杂推理这类任务对精度的敏感度远高于日常聊天,一旦跌破某个阈值,质量不是线性下降而是断崖式下跌</strong>——"大模型低精度通常优于小模型高精度"这个经验规律,是有下限的,不能无限套用。</p>
+            <h3>案例三:EXL2 文件在 Mac 上,连加载的选项都没有</h3>
+            <p>冲着"EXL2 支持精细到 0.1 bit 的位宽调节,压缩效率高"这个卖点,下载了一份 EXL2 模型想在 Mac 上试试,结果发现能跑 EXL2 的运行时(ExLlamaV2/V3)只支持 CUDA,Mac 上压根没有对应的加载方式,这份文件在这台机器上等于是废的。根因是:<strong>EXL2 是绑定专属运行时的格式,选择它之前先要确认自己的平台上有没有对应的运行时,而不是先看"压缩效率高"这个单一优点</strong>。</p>
+            <h2 id="kaiyao">六、为什么开发者要懂</h2>
+            <p>理解格式和算法这两条轴,能把这个专题前后几篇串起来看:</p>
+            <ul><li>跟<strong>上一篇·硬件与环境选型</strong>的关系:这篇的选择表直接建立在上一篇"你的平台是什么"的结论之上——Mac 用户默认往 MLX/GGUF 走,Linux + NVIDIA 生产场景默认往 AWQ + vLLM 走,Windows 用户在原生 CUDA 和 WSL2 之间选,格式选择的第一步永远是先回看上一篇的平台结论。</li><li>跟<strong>下一篇·本地推理引擎全景</strong>的关系:格式选择和引擎选择是强绑定的两件事——这篇先把"文件长什么样"讲清楚,下一篇负责讲"哪个引擎认哪种文件、性能差在哪"。</li><li>跟<strong>集群二·微调方法选型</strong>的关系:QLoRA 这类主流本地微调方法,本质上就是"先把底座模型量化,再在量化后的模型上做 LoRA 微调"——这篇讲的量化精度权衡,会直接影响微调出来的效果上限,后面那篇会展开讲这层关系。</li></ul>
+            <h2 id="wuhu">七、常见误区</h2>
+            <p><strong>误区:"4-bit"是统一标准,不同格式的 4-bit 效果应该差不多。</strong>
+真相:同样标 4-bit,GGUF 的 K-quant 混合精度和 AWQ 的激活感知量化,产出质量可以有明显差距,选型时要看清楚具体是哪种方法,不能只看位数一个数字。</p>
+            <p><strong>误区:量化位数越低,压缩比例越高就越划算。</strong>
+真相:不同任务对精度的敏感度不一样,日常聊天在 Q4 甚至更低位数下差别很难察觉,但复杂推理、代码生成这类任务一旦压得太低,质量会断崖式下跌,不是无脑越低越省。</p>
+            <p><strong>误区:哪个格式流行网上教程多,就该用哪个,不用管自己的平台/引擎。</strong>
+真相:格式和运行时是强绑定关系,EXL2 认 CUDA、MLX 只认 Apple Silicon,选错了不是"将就能用",而是这台机器上根本没有能打开这份文件的工具。</p>
+            <p><strong>误区:GPTQ 和 AWQ 都是 4-bit 量化算法,选哪个都差不多。</strong>
+真相:2026 年 AWQ 已经是 GPU 生产级推理的默认量化算法,加载更快、同等位宽质量普遍优于 GPTQ,新部署基本没有理由再优先选 GPTQ,除非目标模型只发布过 GPTQ 版本。</p>
+            <h2 id="zongjie">八、总结</h2>
+            <p><strong>给小白的话</strong>:选模型文件时,先确认自己在用哪个平台、哪个推理工具(Ollama 认 GGUF、vLLM 认 AWQ/GPTQ、Mac 优先 MLX),再在这个前提下挑量化位数——位数不是越低越好,够用就行。</p>
+            <p><strong>给开发者的话</strong>:把"格式"(装订方式,决定谁能读)和"算法"(删减策略,决定质量损失多少)分开理解,选型时先锁定平台和引擎决定格式,再根据任务对精度的敏感度决定量化位数,不要把这两条轴混在一张排行榜里比较。</p>
+            <p>💡 <strong>格式决定谁能读,算法决定读到的还剩多少。</strong></p>
+            <p><em>(Format decides who can open the book; the algorithm decides how much of it survives the compression.)</em></p>
+            <p><strong>参考资料方向</strong>(仅列真实可查的方向,不编造具体链接):llama.cpp 官方仓库中关于 GGUF 格式规范和 K-quant 量化方案的文档;AWQ(Activation-aware Weight Quantization)原始论文及其在 vLLM 中的集成说明;GPTQ 原始论文;ExLlamaV2/V3 官方仓库关于 EXL2 格式的说明;苹果 MLX 官方文档中关于量化的部分。</p>
+            <p><strong>下一篇预告</strong>:本地推理引擎全景——格式选完了,llama.cpp、Ollama、LM Studio、MLX-LM、vLLM 本地模式这几个引擎,到底该怎么选。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="hardware-and-env.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🧰 硬件与环境选型</span>
+                    </span>
+                </a>
+                <a href="local-inference-engines.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">⚙️ 本地推理引擎全景</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="Local-AI-Engineering.html" class="back-link">← 返回 Local AI Engineering 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
