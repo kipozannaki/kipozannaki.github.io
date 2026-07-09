@@ -6,6 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application & Orchestration · kipozannaki</title>
     <meta name="description" content="LLM 应用的工程化体系：Agent / Skill / Harness / Context / Prompt / Loop">
+    <!-- 跨页主题恢复：文章页/其他专题页切换主题后跳到本专题页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -40,13 +51,13 @@
             </div>
             <div class="sidebar-group">
                 <h3 class="sidebar-title">📚 本专题文章</h3>
-                <a href="prompt-engineering.html" class="sidebar-item" title="Prompt Engineering"><span class="icon">✍️</span><span class="text">Prompt Engineering</span></a>
-                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">🧭</span><span class="text">Context Engineering</span></a>
-                <a href="rag-engineering.html" class="sidebar-item" title="RAG Engineering"><span class="icon">🔍</span><span class="text">RAG Engineering</span></a>
+                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🤖</span><span class="text">Agent</span></a>
                 <a href="skill.html" class="sidebar-item" title="Skill"><span class="icon">🛠️</span><span class="text">Skill</span></a>
-                <a href="agent.html" class="sidebar-item" title="Agent"><span class="icon">🧠</span><span class="text">Agent</span></a>
-                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">🔧</span><span class="text">Harness Engineering</span></a>
-                <a href="workflow-engineering.html" class="sidebar-item" title="Workflow Engineering"><span class="icon">⚙️</span><span class="text">Workflow Engineering</span></a>
+                <a href="harness-engineering.html" class="sidebar-item" title="Harness Engineering"><span class="icon">🎼</span><span class="text">Harness Engineering</span></a>
+                <a href="context-engineering.html" class="sidebar-item" title="Context Engineering"><span class="icon">📦</span><span class="text">Context Engineering</span></a>
+                <a href="prompt-engineering.html" class="sidebar-item" title="Prompt Engineering"><span class="icon">✍️</span><span class="text">Prompt Engineering</span></a>
+                <a href="rag-engineering.html" class="sidebar-item" title="RAG Engineering"><span class="icon">🔍</span><span class="text">RAG Engineering</span></a>
+                <a href="workflow-engineering.html" class="sidebar-item" title="Workflow Engineering"><span class="icon">🪜</span><span class="text">Workflow Engineering</span></a>
                 <a href="loop-engineering.html" class="sidebar-item" title="Loop Engineering"><span class="icon">🔄</span><span class="text">Loop Engineering</span></a>
             </div>
         </aside>
@@ -54,62 +65,60 @@
         <main>
             <section class="section">
                 <h2>📦 专题说明</h2>
-                <p>这一专题聚焦"怎么把 LLM 用起来"——从"写一句 Prompt"到"持续自主运行的调度系统"，按"从内到外、从单次到持续"的顺序讲清八块拼图：</p>
+                <p>这一专题聚焦"怎么把 LLM 用起来"——不关心模型本身怎么造(那是 Foundation 专题的事),只关心手上有了一个能对话的模型之后,怎么把它拼成一个真正能交付任务的系统:</p>
                 <ul>
-                    <li><strong>Prompt Engineering</strong>　是单轮输入的指令写法，决定"怎么说清楚任务"</li>
-                    <li><strong>Context Engineering</strong>　是单次会话的信息组织，决定"喂什么、不喂什么"</li>
-                    <li><strong>RAG Engineering</strong>　是外部知识的供应链，决定"实时信息从哪来"</li>
-                    <li><strong>Skill</strong>　是常用能力的封装，决定"哪些动作可以一键调用"</li>
-                    <li><strong>Agent</strong>　是执行载体，决定"谁来做、做到什么程度"</li>
-                    <li><strong>Harness Engineering</strong>　是给 Agent 画的红线，决定"在多大范围内自主"</li>
-                    <li><strong>Workflow Engineering</strong>　是多步协作的编排，决定"多步怎么串成一条链"</li>
-                    <li><strong>Loop Engineering</strong>　是持续运行的调度系统，决定"什么时候该停、什么时候该交人"</li>
+                    <li><strong>怎么写好提示词</strong>　Prompt Engineering——同一段话改改顺序、举几个例子,效果就明显不一样</li>
+                    <li><strong>怎么管理上下文</strong>　Context Engineering——上下文窗口塞满了怎么办,塞什么才不浪费</li>
+                    <li><strong>怎么让模型查资料</strong>　RAG——纯靠模型"记"已经不够了,要让它能现查</li>
+                    <li><strong>怎么让模型用工具</strong>　Skill / Function Calling——让模型"伸手"调用外面的 API</li>
+                    <li><strong>怎么让模型持续干一件复杂事</strong>　Agent / Workflow——把多步任务拆开,让模型自己来回迭代</li>
+                    <li><strong>怎么约束模型不跑偏</strong>　Harness / Loop——给模型套一层"脚手架",让它在工程边界内反复打磨</li>
                 </ul>
-                <p>八篇互相咬合，建议按顺序读——前一篇文章里的概念，会在下一篇里被重新调用。</p>
+                <p>和 Foundation 专题不同——这一专题关心的是"怎么让模型按我的要求把活干完",而不是"为什么模型会这样回答"。</p>
             </section>
 
             <section class="section">
                 <h2>📚 本专题文章</h2>
                 <div class="articles-grid">
-                    <a href="prompt-engineering.html" class="article-card">
-                        <div class="article-icon">✍️</div>
-                        <h3>Prompt Engineering</h3>
-                        <p>单轮指令的工程化写法</p>
-                    </a>
-                    <a href="context-engineering.html" class="article-card">
-                        <div class="article-icon">🧭</div>
-                        <h3>Context Engineering</h3>
-                        <p>单次会话的信息组织</p>
-                    </a>
-                    <a href="rag-engineering.html" class="article-card">
-                        <div class="article-icon">🔍</div>
-                        <h3>RAG Engineering</h3>
-                        <p>外部知识的检索与注入</p>
+                    <a href="agent.html" class="article-card">
+                        <div class="article-icon">🤖</div>
+                        <h3>Agent</h3>
+                        <p>为什么 Agent 跑着跑着就忘了自己在干什么？为什么多步任务经常卡在第三步？一篇文章把"AI 自己跑流程"这件事最常翻车的点讲清楚。</p>
                     </a>
                     <a href="skill.html" class="article-card">
                         <div class="article-icon">🛠️</div>
                         <h3>Skill</h3>
-                        <p>AI 工具能力的最小单元</p>
-                    </a>
-                    <a href="agent.html" class="article-card">
-                        <div class="article-icon">🧠</div>
-                        <h3>Agent</h3>
-                        <p>智能体架构与自主决策</p>
+                        <p>为什么同一个模型"接上工具"和"不接工具"是两个物种？一篇文章讲清 Skill / Tool / Function Calling 的本质区别和工程实现路径。</p>
                     </a>
                     <a href="harness-engineering.html" class="article-card">
-                        <div class="article-icon">🔧</div>
+                        <div class="article-icon">🎼</div>
                         <h3>Harness Engineering</h3>
-                        <p>LLM 应用的工程化框架</p>
+                        <p>为什么"Prompt 调得再好"也救不了复杂任务？一篇文章讲清"给 LLM 套一层工程脚手架"——Harness 是什么、怎么搭、为什么是 2026 年最被低估的工程范式。</p>
+                    </a>
+                    <a href="context-engineering.html" class="article-card">
+                        <div class="article-icon">📦</div>
+                        <h3>Context Engineering</h3>
+                        <p>为什么上下文塞满不如清空？为什么"调 Prompt"不如"管 Context"？一篇文章讲清 2026 年最被高估的工程概念——以及它真正重要的部分。</p>
+                    </a>
+                    <a href="prompt-engineering.html" class="article-card">
+                        <div class="article-icon">✍️</div>
+                        <h3>Prompt Engineering</h3>
+                        <p>为什么"会写 Prompt"和"会写好 Prompt"是两件完全不同的事？一篇把角色设定、Few-shot、CoT 这些套路背后的"为什么"讲清楚。</p>
+                    </a>
+                    <a href="rag-engineering.html" class="article-card">
+                        <div class="article-icon">🔍</div>
+                        <h3>RAG Engineering</h3>
+                        <p>为什么把文档塞进去不等于"AI 看过了"？一篇文章把分块、嵌入、检索、重排序这条链路里最容易踩的坑讲清楚。</p>
                     </a>
                     <a href="workflow-engineering.html" class="article-card">
-                        <div class="article-icon">⚙️</div>
+                        <div class="article-icon">🪜</div>
                         <h3>Workflow Engineering</h3>
-                        <p>多步协作的可验证编排</p>
+                        <p>为什么"让 AI 自己跑流程"经常不如"画一张流程图让它按节点走"？一篇文章讲清 Workflow / Pipeline / DAG 的工程取舍。</p>
                     </a>
                     <a href="loop-engineering.html" class="article-card">
                         <div class="article-icon">🔄</div>
                         <h3>Loop Engineering</h3>
-                        <p>持续运行的调度系统</p>
+                        <p>为什么"自我迭代、自我批评、自我修正"在 Prompt 层面是鸡汤、在工程层面是 Loop？一篇文章讲清 Loop / Harness / Reflection 的本质区别。</p>
                     </a>
                 </div>
             </section>
@@ -150,6 +159,8 @@
         readBtn.addEventListener('click', function() {
             document.body.classList.toggle('reading-mode');
             const on = document.body.classList.contains('reading-mode');
+            // 用 toggle 同步按钮 active 状态：开启时加 active，关闭时移除
+            // 旧代码用 add 只加不移，导致关闭阅读模式后按钮仍高亮
             readBtn.classList.toggle('active');
             safeSet('reading', on ? '1' : '0');
         });
