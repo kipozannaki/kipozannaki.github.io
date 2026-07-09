@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<!-- 文章页：⚙️ 本地推理引擎全景（由 .md 自动生成的 HTML，请勿手工编辑） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚙️ 本地推理引擎全景 · kipozannaki</title>
+    <meta name="description" content="llama.cpp / Ollama / LM Studio / MLX-LM / vLLM 本地模式 · 双栖科普">
+    <!-- 跨页主题恢复：local-ai-engineering 专题页切换主题后跳到文章页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式 storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="Local-AI-Engineering.html" class="active">Local AI Engineering</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⚙️ 本地推理引擎全景</h1>
+            <p class="meta">llama.cpp / Ollama / LM Studio / MLX-LM / vLLM 本地模式 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#yinyan">一、引言</a> · <a href="#duizhao">二、五个工具对照</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#gongzuo">四、怎么工作</a> · <a href="#fanche">五、翻车现场</a> · <a href="#kaiyao">六、为什么开发者要懂</a> · <a href="#wuhu">七、常见误区</a> · <a href="#zongjie">八、总结</a></p>
+
+<h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来简单、实际上没那么简单的问题:</p>
+            <ul><li>都叫"本地跑大模型的工具",Ollama 和 vLLM 是不是同一类东西,选哪个基本靠喜好?</li><li>网上测评经常说 vLLM 比 Ollama 快十几倍,是不是意味着不管什么场景,vLLM 都该是更优的选择?</li><li>Ollama 一直被叫做"套了个壳的 llama.cpp",这个说法现在还成立吗?</li><li>LM Studio 长得完全不像命令行工具 Ollama,它们背后用的是不是同一套东西?</li><li>为什么真人测出来的速度差距,经常没有测评标题党写的那么夸张?</li></ul>
+            <p>这些问题背后,指向同一件事:<strong>"本地推理引擎"这五个字,其实盖住了三种完全不同的角色——有的是给你省心的前台,有的是真正干活的后厨,有的压根不是为你一个人设计的</strong>。分不清这三种角色,选型时就很容易被一张"谁更快"的排行榜带偏。</p>
+            <h2 id="duizhao">二、五个工具对照</h2>
+            <table><thead><tr><th>名称</th><th>角色定位</th><th>支持格式</th><th>单用户 vs 并发</th><th>三平台情况</th></tr></thead><tbody><tr><td><strong>Ollama</strong></td><td>体验层(封装引擎,负责下载/管理/一键运行)</td><td>非 Mac 平台走 GGUF;Mac 平台自 2026 年 3 月的 0.19 版本起默认走 MLX 后端</td><td>单用户,默认一次处理一个请求</td><td>三平台通用,Mac 上会自动切换到 MLX</td></tr><tr><td><strong>LM Studio</strong></td><td>体验层(GUI,内置模型浏览器)</td><td>GGUF 和 MLX 都支持,可以并排跑</td><td>单用户为主,也提供无界面的常驻服务模式面向小团队</td><td>Windows / Mac / Linux 桌面版都有</td></tr><tr><td><strong>llama.cpp</strong></td><td>引擎(真正做推理计算的底层)</td><td>GGUF</td><td>单用户/嵌入式场景,是 Ollama、LM Studio 在非 Mac 平台下面跑的那个引擎</td><td>支持范围最广,从树莓派到服务器都能编译运行</td></tr><tr><td><strong>MLX-LM</strong></td><td>引擎(苹果官方,Apple Silicon 原生)</td><td>MLX 格式 / safetensors</td><td>单用户,同时也是 Mac 本地微调的主要入口</td><td>仅限 Apple Silicon</td></tr><tr><td><strong>vLLM</strong></td><td>服务系统(为并发服务设计,不是"跑一个模型"这么简单)</td><td>原生支持 safetensors / AWQ / GPTQ / FP8;GGUF 支持仍是实验性的,且只能处理单文件 GGUF</td><td>专为并发设计,核心机制是 PagedAttention + 连续批处理,并发吞吐能力远超前面几个工具</td><td>Linux 原生体验最完整;Windows 需要通过 WSL2;Mac 上没有 Metal 加速,会退化成 CPU 推理,不现实</td></tr></tbody></table>
+            <p>一句话理解这张表:<strong>Ollama 和 LM Studio 是"体验层",llama.cpp 和 MLX-LM 是真正干活的"引擎",vLLM 是专门为"很多人同时用"设计的"服务系统"——这是三个不同的角色分工,不是同一个赛道上的五个选手</strong>。</p>
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+            <h3>方案一:唯一标准是网上测评的 tok/s 排行榜,谁快用谁</h3>
+            <p>大多数展示"vLLM 比 Ollama 快十几倍"的测评,测的是<strong>并发负载</strong>下的吞吐量——这个倍数差距是真实的,但它衡量的是"同时服务很多人"这个场景,不是你一个人在电脑上问一句话的体验。单用户场景下,几个工具的速度其实相当接近,很多测评里看起来夸张的差距,相当一部分来自对比双方用的量化精度不同(比如一边是 4-bit 量化,一边是 FP16 全精度),而不是纯粹的引擎实力差距。只看一张笼统的排行榜选型,容易把"并发能力"和"单用户体验"这两件事混为一谈。</p>
+            <h3>方案二:因为 Ollama 最简单最流行,所有场景都用它</h3>
+            <p>Ollama 默认一次只处理一个请求,这个设计对个人使用完全没问题,但如果你想拿它给一个小团队甚至更多并发用户提供内部服务,负载一上来,响应时间会从几百毫秒直接恶化成排队等待——这不是配置没调好,而是它的架构设计目标本来就不是"服务很多人"。</p>
+            <h3>方案三:为了"性能最大化",不管场景无脑上 vLLM</h3>
+            <p>vLLM 是为生产级并发服务设计的,这意味着它要求一个 Python 环境、真实的 NVIDIA/AMD GPU,配置成本比 Ollama 高出一截,而且首次启动往往要编译 CUDA kernel,冷启动可能需要几分钟——对一个只想在自己电脑上试试新模型的个人开发者来说,这是杀鸡用牛刀,省下的那点"理论峰值性能"根本用不上,却要多背负一堆本不需要的运维负担。</p>
+            <p>💡 三条路都在同一个地方摔倒:<strong>把"选引擎"简化成了一个单一速度排行榜,而实际上这是"你的场景是单用户还是并发服务"这一个问题决定的分岔路口,分岔之后才轮到具体选哪个工具</strong>。</p>
+            <h2 id="gongzuo">四、怎么工作</h2>
+            <p>不讲底层实现,讲几个类比。</p>
+            <p><strong>Ollama 和 LM Studio,像是餐厅的前台加服务员</strong>。你不需要懂后厨具体怎么切菜、怎么掌握火候(不用管 GGUF 怎么加载、Metal 怎么调用底层显卡指令),说一句"我要这道菜"(<code>ollama run</code> 或者在 LM Studio 里点一下下载按钮),菜就端上来了。这套前台服务背后,真正在后厨干活的是 llama.cpp(大多数平台)或者 MLX(Mac 平台)。</p>
+            <p><strong>llama.cpp 和 MLX-LM,才是真正的后厨</strong>。这里决定了"菜"(推理结果)做出来的速度上限和风味——Ollama、LM Studio 本质上是给这个后厨配了一套好用的前台系统,后厨本身的实力才是天花板。</p>
+            <p><strong>vLLM,像是团餐食堂的中央厨房</strong>,设计目标从一开始就不是"给一个人做一顿饭",而是同时处理几十上百份订单还互不耽误。它的核心机制 PagedAttention,可以类比成"给每一份订单精确分配料理台位置,用多少占多少,不多占也不浪费"——而不是像家庭厨房那样"一次只能炒一道菜,炒完这道才能开始下一道"(这正是 Ollama 默认单请求处理的方式)。中央厨房的这套流水线,在同时处理很多订单时优势巨大,但如果只有一个人吃饭,启动整套流水线反而比家庭厨房更麻烦、更慢热。</p>
+            <p><strong>测评里"巨大速度差距"经常是一种错觉,类比成比较两家餐厅的出餐速度</strong>。一家用的是预先切配好的半成品(量化过的 4-bit 模型),另一家坚持现切现做全份食材(未量化的 FP16 模型)——中央厨房听起来快很多,但很大程度上是因为两边比的根本不是同一份食材复杂度,把量化精度拉齐之后,速度差距通常会明显收窄。</p>
+            <h2 id="fanche">五、翻车现场</h2>
+            <h3>案例一:团队内部工具搭在 Ollama 上,业务上量后卡成一团</h3>
+            <p>有团队图省事,把面向内部十几个同事的问答工具直接搭在 Ollama 上,一开始用的人少,体验很好。等到用的人变多、并发请求同时打进来,响应时间从几百毫秒的水平,恶化成排队等待、甚至几秒钟才出结果。根因是:<strong>Ollama 默认一次只处理一个请求,吞吐量在并发负载下会断崖式下降</strong>——这不是一个"调优就能解决"的小问题,而是架构设计目标决定的天花板,真要支撑并发场景,需要换成为此设计的服务系统。</p>
+            <h3>案例二:个人开发者为了"追求最大性能",一上来就选 vLLM 做原型开发</h3>
+            <p>有人看了性能对比表,觉得"既然 vLLM 最快,那就该一直用它",结果在自己电脑上搭建原型时,先卡在 Python 环境和 CUDA 依赖的配置上,好不容易跑通了,第一次启动又因为要编译 CUDA kernel 等了好几分钟才看到第一条回复。根因是:<strong>vLLM 的设计目标是生产级并发服务,不是为个人原型开发的启动速度优化的</strong>,为了一个用不上的并发性能,牺牲了个人开发阶段最看重的"随手跑起来"的体验,选错了工具类别。</p>
+            <h3>案例三:拿 vLLM 加载 GGUF 模型,体验反而更差</h3>
+            <p>有人觉得"vLLM 功能最全,理论上什么格式都该能处理",于是尝试用 vLLM 加载一个 GGUF 模型,结果发现 vLLM 对 GGUF 的支持仍是实验性的、优化程度不够,而且只能处理单文件 GGUF——很多较大的模型的 GGUF 文件会被拆分成多个分片,直接用不了。实际体验比直接用 llama.cpp 明显更差,vLLM 官方文档自己也建议:如果手头只有 GGUF,该用的是 llama.cpp,不是硬凑 vLLM。根因是:<strong>"功能最全"不等于"每种格式都是它的强项"</strong>,vLLM 的原生优势在 safetensors、AWQ、GPTQ 这类生产格式上,GGUF 从来不是它的主场。</p>
+            <h2 id="kaiyao">六、为什么开发者要懂</h2>
+            <p>理解这五个工具的角色分工,能把前两篇和这篇串起来看:</p>
+            <ul><li>跟<strong>第一篇·硬件与环境选型</strong>的关系:这篇表格里"vLLM 在 Mac 上不现实、Windows 上要走 WSL2"这两条,直接呼应第一篇讲的平台差异——选引擎之前,平台前提早就定好了大半个答案。</li><li>跟<strong>上一篇·模型格式与量化实践</strong>的关系:格式和引擎强绑定——手头是 GGUF 就该往 llama.cpp/Ollama 系走,手头是 AWQ/GPTQ 就该往 vLLM 系走,案例三就是反过来选错的下场。</li><li>跟<strong>下一篇·本地服务化部署</strong>的关系:这篇解决的是"用哪个引擎跑模型",下一篇要解决的是"怎么把选定的引擎包成一个稳定的常驻服务,让别的程序能持续调用"。</li><li>跟<strong>集群二·微调工具链</strong>的关系:MLX-LM 不只是一个推理引擎,也是 Mac 本地微调的主要入口,这条线索会在"微调工具链三平台对比"那篇展开讲。</li></ul>
+            <h2 id="wuhu">七、常见误区</h2>
+            <p><strong>误区:网上测评说 vLLM 比 Ollama 快十几倍,所以 vLLM 永远是更好的选择。</strong>
+真相:那个倍数差距是在并发负载下测出来的,单用户场景下几个工具的速度其实很接近,而且很多测评展示的"巨大差距"里混进了量化精度不同的因素,不是单纯的引擎差距。</p>
+            <p><strong>误区:Ollama 现在还是"套了个壳的 llama.cpp"。</strong>
+真相:自 2026 年 3 月的 0.19 版本起,Ollama 在 Apple Silicon 上已经默认走 MLX 后端,不再是 llama.cpp 的 Metal 路径——"Ollama 就是 llama.cpp 加个 CLI"这个认知在 Mac 上已经过时了。</p>
+            <p><strong>误区:vLLM 功能最全,什么格式都能处理,应该当成万能选择。</strong>
+真相:vLLM 对 GGUF 的支持是实验性且未充分优化的,只能处理单文件 GGUF,如果手头是 GGUF 格式,该用的还是 llama.cpp 系工具——vLLM 的强项在 safetensors/AWQ/GPTQ 这类生产格式上。</p>
+            <p><strong>误区:选推理引擎只需要考虑 Linux/NVIDIA 的情况,反正大部分教程都是这么写的。</strong>
+真相:vLLM 在 Mac 上没有 Metal 加速会退化成 CPU 推理,基本不现实;在 Windows 上要通过 WSL2 才能用,多一层间接开销——引擎选择必须回头对照第一篇定下的平台前提。</p>
+            <h2 id="zongjie">八、总结</h2>
+            <p><strong>给小白的话</strong>:自己一个人在电脑上跑模型,Ollama 或者 LM Studio 基本就够了,不用被"vLLM 更快"的测评标题吓到去折腾一套自己根本用不上的生产级工具。</p>
+            <p><strong>给开发者的话</strong>:选引擎先问自己一个问题——这是给一个人用的原型,还是要支撑多个并发用户的服务?答案决定了你该往"体验层/引擎"这一侧走,还是该直接上 vLLM 这类服务系统;选定方向之后,再回头对照前两篇确定的平台和格式,基本就能锁定答案。</p>
+            <p>💡 <strong>先分清楚是给一个人做饭,还是给一百人开餐,工具的选择自然就分岔了。</strong></p>
+            <p><em>(Decide whether you're cooking for one or running a canteen — the tool choice follows from that, not the other way around.)</em></p>
+            <p><strong>参考资料方向</strong>(仅列真实可查的方向,不编造具体链接):llama.cpp 官方仓库文档;Ollama 官方发布说明中关于 Apple Silicon MLX 后端切换的公告;vLLM 官方文档中关于支持的量化格式和 GGUF 加载限制的说明;PagedAttention 相关的原始论文;MLX 官方仓库中 MLX-LM 部分的文档。</p>
+            <p><strong>下一篇预告</strong>:本地服务化部署——引擎选好了,怎么把它包成一个开机即用、稳定常驻的 API 服务。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="model-format-quantization.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🗜️ 模型格式与量化实践</span>
+                    </span>
+                </a>
+                <a href="local-serving.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">📡 本地服务化部署</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="Local-AI-Engineering.html" class="back-link">← 返回 Local AI Engineering 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
