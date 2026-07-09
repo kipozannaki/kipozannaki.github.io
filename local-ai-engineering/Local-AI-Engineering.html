@@ -6,6 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local AI Engineering · kipozannaki</title>
     <meta name="description" content="本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操，从跑起来到针对特定任务微调">
+    <!-- 跨页主题恢复：文章页切换主题后跳到本专题页时保持一致
+         必须放在 <link rel="stylesheet"> 之前，避免 FOUC（页面先 light 渲染再切 dark 的短暂闪烁） -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式/无痕模式等 storage 不可用时静默降级 */ }
+    })();
+    </script>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -25,7 +36,7 @@
 
     <section class="hero-compact">
         <h1>Local AI Engineering</h1>
-        <p>本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操 · 规划 13 篇</p>
+        <p>本地模型部署、训练与微调：Mac / Linux / Windows 三平台实操 · 已上线 3 篇 · 规划 13 篇</p>
     </section>
 
     <div class="site-layout">
@@ -75,17 +86,17 @@
                 <div class="articles-grid">
                     <a href="hardware-and-env.html" class="article-card">
                         <div class="article-icon">🧰</div>
-                        <h3>硬件与环境选型</h3>
+                        <h3>硬件与环境选型 <span style="display:inline-block;margin-left:8px;padding:2px 8px;font-size:0.65em;font-weight:normal;background:#10b981;color:#fff;border-radius:10px;vertical-align:middle;line-height:1.4;">✓ 已上线</span></h3>
                         <p>同样是"能跑本地模型"，Mac 的统一内存、Linux 的独立显存、Windows 的 WSL2 绕路，起点差在哪？一篇讲清三大平台的算力和生态前提，决定后面所有选择的上限。</p>
                     </a>
                     <a href="model-format-quantization.html" class="article-card">
                         <div class="article-icon">🗜️</div>
-                        <h3>模型格式与量化实践</h3>
+                        <h3>模型格式与量化实践 <span style="display:inline-block;margin-left:8px;padding:2px 8px;font-size:0.65em;font-weight:normal;background:#10b981;color:#fff;border-radius:10px;vertical-align:middle;line-height:1.4;">✓ 已上线</span></h3>
                         <p>同一个模型，GGUF、MLX、GPTQ/AWQ/EXL2 该选哪个？一篇讲清格式和量化方案在你这台机器上到底跑不跑得动，而不是纠结算法内部怎么算误差补偿。</p>
                     </a>
                     <a href="local-inference-engines.html" class="article-card">
                         <div class="article-icon">⚙️</div>
-                        <h3>本地推理引擎全景</h3>
+                        <h3>本地推理引擎全景 <span style="display:inline-block;margin-left:8px;padding:2px 8px;font-size:0.65em;font-weight:normal;background:#10b981;color:#fff;border-radius:10px;vertical-align:middle;line-height:1.4;">✓ 已上线</span></h3>
                         <p>llama.cpp、Ollama、LM Studio、MLX-LM、vLLM 本地模式，谁在哪个平台是"一等公民"、谁是"能用但要自己填坑"？一篇讲清怎么选。</p>
                     </a>
                     <a href="local-serving.html" class="article-card">
@@ -186,7 +197,6 @@
         sideBtn.addEventListener('click', function() {
             document.body.classList.toggle('sidebar-open');
             const on = document.body.classList.contains('sidebar-open');
-            sideBtn.classList.toggle('active');
             safeSet('sidebarOpen', on ? '1' : '0');
         });
     })();
