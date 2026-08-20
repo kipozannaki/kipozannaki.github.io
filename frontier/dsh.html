@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：DSH（DeepSeek Harness，沿用 global-workspace.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSH · kipozannaki</title>
+    <meta name="description" content="DeepSeek Harness：2026-08 开源的 Agent 框架，Cordis 插件内核 + 可逆副作用，连 agent loop 都能换的「一切皆插件」底座。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🧩 DSH</h1>
+            <p class="meta">DeepSeek Harness：连「决定下一步做什么」的主循环都能像插件一样被换掉，agent 底座的终极形态是「一切皆插件」吗？</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#yinyan">一、引言</a> · <a href="#zuobiao">二、坐标</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#gongzuo">四、怎么工作</a> · <a href="#kexin">五、可逆副作用与自进化</a> · <a href="#kaiyao">六、为什么开发者要懂</a> · <a href="#wuhu">七、常见误区</a> · <a href="#zongjie">八、总结</a></blockquote>
+
+            <h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来很简单、实际上没那么简单的问题:</p>
+            <ul>
+                <li>为什么 Claude Code、Codex 这些主流编码 Agent,想换个模型、换套工具、加一层审计,往往只能 fork 源码、跟社区版本分道扬镳?</li>
+                <li>一个 Agent 框架里,"决定下一步该调用哪个工具"的这个主循环,凭什么就不能像浏览器插件一样,想换就换、说卸就卸?</li>
+                <li>如果 AI 自己就能开发、测试、替换自己身上的插件,那 Agent 的进化还会是"等人类发新版"的慢节奏吗?</li>
+                <li>装了上百个插件之后,怎么保证卸载其中一个,不会把整个系统的状态搞得一团糟、留下孤儿状态?</li>
+                <li>为什么 DeepSeek 2026 年 8 月开源的 Agent 框架,把"模型适配器、工具注册表、会话、沙箱、存储、主循环"全都做成了插件——这到底是营销口号,还是真刀真枪的架构选择?</li>
+            </ul>
+            <p>这些问题背后,指向的是 DeepSeek Harness(简称 DSH)在 2026 年 8 月 13 日以 MIT 协议开源的首个 Agent 框架给出的一个答案:<strong>Model + Harness = Agent——模型负责思考,Harness 负责执行,而 Harness 的每一层能力都做成可替换的 Cordis 插件,连主循环都不例外</strong>。</p>
+
+            <h2 id="zuobiao">二、坐标</h2>
+            <p>DSH 是"执行基础设施"层面的开源尝试。理解它在整个知识体系里的位置,要先划清几条边界:</p>
+            <table>
+                <thead>
+                    <tr><th>概念</th><th>关注的问题</th><th>跟本文的区别</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frontier·Reasoning Model</td>
+                        <td>o1/r1 这类模型怎么被训练出"愿意想更久"的能力,关注的是训练范式</td>
+                        <td>DSH 不关心模型怎么想,它关心的是模型想完之后"怎么把事办成"——工具调度、会话管理、任务闭环这一整套执行层</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·A2A / MCP</td>
+                        <td>Agent 之间、Agent 与工具之间用什么协议通信</td>
+                        <td>MCP 定义"工具长什么样",A2A 定义"Agent 之间怎么聊",DSH 则是一个真正把这些组件跑起来的运行时底座——插件化的 harness</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·Agent Memory</td>
+                        <td>Agent 该记什么、怎么检索、怎么遗忘</td>
+                        <td>会话记忆只是 DSH 的八层业务平面之一(Session 层),整篇文章讲的是这个"把一切都做成插件"的组合方式本身</td>
+                    </tr>
+                    <tr>
+                        <td>Claude Code / Codex</td>
+                        <td>把编码 Agent 做成产品,给开发者开箱即用</td>
+                        <td>它们把扩展点锁死在产品核心,想深度定制往往只能 fork;DSH 把整套执行层以 MIT 开源,主张在配置层完成一切改动,不碰源码</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一句话理解 DSH 的位置:<strong>它不是又一个"卷模型"的产物,而是"卷执行基础设施"的产物——在 Agent 赛道从模型竞争转向执行层竞争的 2026 年,它把"执行层本身"变成了可以自由拼装的乐高</strong>。</p>
+
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+
+            <h3>方案一:像 Claude Code 那样做成一站式产品</h3>
+            <p>产品化的优势是开箱即用,代价是扩展点被锁死在核心:想换模型提供商、想加自定义工具、想插入审计日志,只能走产品提供的有限配置,或者直接 fork 源码跟官方版本脱钩。DSH 走的是反方向——把"核心"本身也做成可替换的,让改动全部发生在配置层。</p>
+
+            <h3>方案二:传统意义上的"插件系统",只把工具和提示词做成可插拔</h3>
+            <p>很多框架也说自己支持插件,但细看会发现:能插的只有工具和 prompt,而"决定下一步做什么"的 agent loop 仍然是一块动不得的铁板。DSH 的关键区别恰恰在这里——<strong>连主循环本身都是插件</strong>。官方文档明确把模型适配器、工具注册表、会话日志、agent loop 都列为基于插件的子系统,这正是"一切皆插件"和"支持插件"的本质差异。</p>
+
+            <h3>方案三:把系统拆成一个个微服务</h3>
+            <p>微服务能解决解耦问题,但代价是通信、部署、版本管理的复杂度暴涨,而且"运行时要能卸载一个组件并精确恢复状态"这件事,微服务并没有天然的机制保证。Cordis 内核用"可逆副作用 + 依赖注入 + 事件总线"三件套,在单进程内就完成了组件级的动态装卸,不需要引入一整套微服务基础设施。</p>
+
+            <p>💡 <strong>三条路要么锁死核心、要么只开放皮毛、要么杀鸡用牛刀——DSH 选择的是把"内核"彻底空心化,让一切能力都以插件形式平等地挂载到 Cordis 之上</strong>。</p>
+
+            <h2 id="gongzuo">四、怎么工作</h2>
+            <p>不讲源码细节,讲几个类比和结构。</p>
+            <p><strong>Cordis 是一个"插件元框架",它只做三件事:插件生命周期管理、插件间依赖注入、全局事件总线</strong>。它自己不含任何模型、工具或 UI 逻辑——这保证了"内核没有需要 patch 的特权代码"。插件之间通过 service(服务)和 typed event(类型化事件)协作:服务是能力的接口契约,事件是插件间松耦合的通信通道。</p>
+            <p><strong>八层业务平面,每一层都是一个可替换插件</strong>:模型(Model)、工具(Tool)、技能(Skill)、会话(Session)、沙箱(Sandbox)、存储(Storage)、主循环(Loop)、调度(Scheduling),UI 作为呈现层独立挂载。用一句大白话说——整个 harness 是"八块乐高积木 + 一个拼积木的底座(Cordis)",任何一块积木都能换,底座自己不生产任何积木。</p>
+            <p><strong>每个能力严格拆成 Service / Provider / Consumer 三层</strong>:接口定义(Service)、具体实现(Provider)、消费方(Consumer)。比如把文件系统 provider 从本地目录换成远程沙箱,所有碰文件的工具会自动跟随切换,一行代码都不用改——这就是"能力接缝"的价值。</p>
+            <p><strong>配置采用 Bundles / Profiles / Patches 三级级联,类似 CSS 的层叠规则</strong>:官方 bundle 提供默认组合,profile 是命名好的栈(比如 web 带浏览器界面、headless 是单次运行器),patch 可以精确覆盖单个插件的配置。想换工具提供商?在配置里加一行,而不是改源码。</p>
+            <p><strong>四种内置模式覆盖不同场景</strong>:Standard 是全功能编码 Agent(文件编辑、shell、文件与网页搜索、技能、规划、目标、子 Agent、工作流);Code 模式(PTC)把工具暴露成 SDK,让模型写一段 TypeScript 程序编排多步操作;Minimal 只留 bash + 文件编辑器两个工具,用于基准测试隔离;Creator 模式让你直接检查运行时、在内存里试验 Cordis 插件、现场拼装新模式。</p>
+            <table>
+                <thead>
+                    <tr><th>模式</th><th>定位</th><th>代表能力</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Standard</td>
+                        <td>全功能编码 Agent</td>
+                        <td>文件编辑、shell、搜索、技能、规划、目标、子 Agent、工作流</td>
+                    </tr>
+                    <tr>
+                        <td>Code (PTC)</td>
+                        <td>程序化工具调用</td>
+                        <td>模型用 TypeScript 程序编排多轮工具调用,处理单次调用搞不定的复杂逻辑</td>
+                    </tr>
+                    <tr>
+                        <td>Minimal</td>
+                        <td>基准测试隔离</td>
+                        <td>仅持久 bash + str_replace_editor 两个工具</td>
+                    </tr>
+                    <tr>
+                        <td>Creator</td>
+                        <td>运行时检查与插件实验</td>
+                        <td>检查运行时、内存中试验 Cordis 插件、现场编写新预设</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>每一次运行都是可追溯的</strong>:模型看到的一切——系统提示、推理过程、工具调用与结果、子 Agent 调度、每次上下文注入——都被写进一个 append-only 的会话日志。Trajectory 视图可以按来源检查这些记录,resume / fork / 搜索 / 重放都基于同一条事件流,而且都不需要重新执行 Agent。</p>
+
+            <h2 id="kexin">五、可逆副作用与自进化</h2>
+
+            <h3>可逆副作用(reversible effects):卸载不残留</h3>
+            <p>这是 Cordis 设计里最值得讲的一块。它的核心定义只有一句话:<strong>对上下文的每一次修改,都必须有一个显式的逆函数,让副作用可逆</strong>。插件加载时,每次状态修改都会记录对应的逆函数,按顺序叠成一个"撤销链";插件卸载时,按反序执行这条链,把系统状态精确恢复到加载之前——就像叠盘子,最后放上去的盘子最先被拿走。</p>
+
+            <h3>响应式依赖(reactive coeffects):依赖不会失联</h3>
+            <p>插件之间不是"写死谁依赖谁"的静态关系,而是响应式的:依赖关系会在运行时被自动跟踪、协调,某个插件卸载后,依赖它的插件能立刻感知到状态变化,而不是等到运行时报错才暴露问题。</p>
+
+            <h3>自进化:让 AI 自己给自己换插件</h3>
+            <p>因为插件支持真正的热插拔——加载/卸载不需要重启系统,任何配置错误都可以完整回滚——所以<strong>让 AI 自己开发、测试、替换插件这件事第一次变得现实</strong>。一个 Agent 发现自己缺某个工具,可以当场写一个插件、挂上去、验证、不行就回滚。企业试错的成本从"等下周发版"降到"让模型当场迭代"。</p>
+
+            <h2 id="kaiyao">六、为什么开发者要懂</h2>
+            <ul>
+                <li>跟<strong>选型与落地</strong>的关系:如果你是做私有化 / 自研 Agent 底座的技术负责人,DSH 提供了一种"不 fork、纯配置组合"的替代路径——模型适配器支持近 40 家提供商,还能接自定义 OpenAI 兼容端点,绑定某家模型的问题被彻底解掉。</li>
+                <li>跟<strong>可观测性</strong>的关系:append-only 会话日志 + Trajectory 视图,让"这次运行模型到底看到了什么、干了什么"变得可审计、可重放、可事后复盘——这是生产环境排障的关键能力,也是很多闭源产品做不到的透明。</li>
+                <li>跟<strong>架构思考</strong>的关系:Service / Provider / Consumer 三层拆分、"能力接缝"、配置级联、可逆副作用,这套思想不只在 Agent 领域适用——任何想做成"可组合底座"的系统,都可以从中抄作业。</li>
+                <li>跟未来的关系:2026 年的 Agent 竞争正在从"卷模型"转向"卷执行基础设施",DSH 把执行层整体开源,意味着这一层的演进速度会显著加快;而"让 AI 自己改自己底座"的能力,可能重新定义 Agent 的进化节奏。</li>
+            </ul>
+
+            <h2 id="wuhu">七、常见误区</h2>
+            <p><strong>误区:"一切皆插件"只是营销口号。</strong><br>
+            真相:连 agent loop、调度器、模型适配器都是插件,这是文档和源码都明确支持的架构事实;把"插件化"延伸到主循环层面,是它和"支持插件"的框架最根本的区别。</p>
+            <p><strong>误区:插件越多越好,DSH 可以当乐高随便堆。</strong><br>
+            真相:插件之间通过 service 接口和事件解耦,但复杂组合依然需要验证;好在可逆副作用保证了卸载时能精确回滚,把"堆错了"的代价从"污染系统"降到"撤销加载"。</p>
+            <p><strong>误区:DSH 是又一个"开源的 Claude Code",直接用就行。</strong><br>
+            真相:官方明确标注这是 developer preview,兼容性破坏的变更随时可能出现;当前阶段适合"研究、原型、扩展",要成为生产级底座还需要更多运行证据。</p>
+            <p><strong>误区:用了 DSH 就等于不依赖某个模型了。</strong><br>
+            真相:模型适配器插件化确实大幅降低了切换成本,但"Agent 效果的好坏"仍然主要取决于模型本身的推理质量——插件化解决的是"换得动",不是"不用换"。</p>
+
+            <h2 id="zongjie">八、总结</h2>
+            <p><strong>给小白的话</strong>:DSH 是 DeepSeek 2026 年 8 月开源的 Agent 框架,核心主张是"Model + Harness = Agent"——模型负责想,一个可插拔的执行层负责干。它把工具、记忆、沙箱、连"下一步干什么"的主循环都做成了可以随时换掉的插件,靠一套"可逆副作用"机制保证卸载不留脏东西。</p>
+            <p><strong>给开发者的话</strong>:如果你的团队正在纠结"自研 Agent 底座还是用闭源产品",DSH 的价值不在于立刻上生产,而在于它示范了一套"内核空心化 + 配置组合"的架构,以及"让 AI 自己给自己换插件"的自进化路径——这两件事,值得任何做 Agent 基建的人认真研究。</p>
+
+            <p>💡 <strong>当连"决定下一步做什么"本身都可以被插件化替换时,Agent 的底座第一次变得像浏览器一样可组合、可回滚、可进化。</strong><br>
+            <em>(When even the loop that decides what to do next becomes a swappable plugin, the agent substrate finally becomes as composable, reversible, and evolvable as a browser.)</em></p>
+
+            <p><strong>参考资料方向</strong>:DeepSeek Harness 官方站点与 GitHub 仓库(deepseek-ai/deepseek-harness,2026-08-13 v0.1 MIT 开源);Cordis 插件框架官方仓库与论文(cordiverse);DeepSeek 官方博客《Everything is a plugin》;社区对 Harness v0.1 架构的解析文章(八层可插拔架构 HPA 模型);NVIDIA/Google 等生态对 DFlash 的集成(供交叉参考)。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="global-workspace.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🪞 Global Workspace</span>
+                    </span>
+                </a>
+                <a href="dflash2.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">下一站</span>
+                        <span class="nav-title">⚡ DFlash2</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
