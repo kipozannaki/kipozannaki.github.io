@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：DFlash2（沿用 global-workspace.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFlash2 · kipozannaki</title>
+    <meta name="description" content="Inco AI 2026-08 发布：块扩散投机解码的下一代。候选路径选择 + 轻量卷积，把单次验证收益再抬 20%+。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⚡ DFlash2</h1>
+            <p class="meta">Inco AI 2026-08 发布：当"猜词"已经并行,剩下的瓶颈是"把猜对的词串起来"——候选路径选择如何让每次验证再多榨出 20%?</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#yinyan">一、引言</a> · <a href="#zuobiao">二、坐标</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#xuanze">四、选择器：把对的选择出来</a> · <a href="#juanji">五、卷积：把局部依赖补回来</a> · <a href="#shuju">六、数据说话</a> · <a href="#kaiyao">七、为什么开发者要懂</a> · <a href="#wuhu">八、常见误区</a> · <a href="#zongjie">九、总结</a></blockquote>
+
+            <h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来很简单、实际上没那么简单的问题:</p>
+            <ul>
+                <li>自回归大模型一次只能吐一个 token,GPU 计算强度低、利用率差——投机解码让它"一次多猜几个",但猜的这一步,凭什么也非要一个 token 一个 token 地来?</li>
+                <li>如果猜词已经做到了整块并行,为什么一个块里"每个词单独都对、串起来却不顺"的块,还是会被验证环节一刀切短?</li>
+                <li>想让猜出来的整块更连贯,传统思路是加"预测下一个位置的注意力头"或加深模型——但有没有比"多算"更便宜的办法,比如"在已经猜出来的候选项里选出一条好路径"?</li>
+                <li>一个五层小模型的块扩散草稿器,在块的末尾位置准确率会明显下滑——这到底是模型太浅了,还是"局部依赖没被建模"这个可以精准修复的问题?</li>
+                <li>2026 年 1 月 DFlash 发布,七个月下载超 350 万、跑进 SGLang/vLLM/TensorRT-LLM/llama.cpp——下一代 DFlash2 又是靠什么,在"输出不变"的前提下再快 20%?</li>
+            </ul>
+            <p>这些问题背后,指向的是 Inco AI 在 2026 年 8 月 18 日发布的技术博客给出的一个答案:<strong>投机解码已经解决了"并行猜",DFlash2 要解决的是"猜对之后怎么把它串成一条连贯的路"——靠一个几乎零开销的候选路径选择器,加上一个专门补局部依赖的轻量卷积,每次验证通过的 token 数再多 20% 以上,而输出可证明不变</strong>。</p>
+
+            <h2 id="zuobiao">二、坐标</h2>
+            <p>DFlash2 是"推理速度"这条线上的最新一站。理解它在整个知识体系里的位置,要先划清几条边界:</p>
+            <table>
+                <thead>
+                    <tr><th>概念</th><th>关注的问题</th><th>跟本文的区别</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frontier·Inference Scaling</td>
+                        <td>推理时算力和效果提升之间的定量关系,关注"多算"能换来多少提升</td>
+                        <td>DFlash2 走的是完全相反的方向——在保证输出不变的前提下,用更少的有效计算换来更多 token,是"少算不降质"的典型代表</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·Long Thinking</td>
+                        <td>让模型"想得更久",用测试时计算换质量</td>
+                        <td>恰好对应关系:推理模型思考链越来越长,反而放大了自回归解码"一次一个 token"的瓶颈——这正是 DFlash2 这类加速技术越来越重要的原因</td>
+                    </tr>
+                    <tr>
+                        <td>传统投机解码(EAGLE 系列 / MTP)</td>
+                        <td>用小草稿模型一个 token 一个 token 地猜,目标模型并行验证</td>
+                        <td>草稿阶段仍是自回归的,误差累积把加速比封在 2–3×;DFlash/DFlash2 把草稿也做成一次前向生成整块,突破了这道天花板</td>
+                    </tr>
+                    <tr>
+                        <td>DFlash(2026.1)</td>
+                        <td>块扩散草稿模型,单次前向并行生成一整块候选 token</td>
+                        <td>DFlash2 是它的直接下一代:DFlash 每个位置独立并行猜测,DFlash2 在此基础上加了候选路径选择 + 轻量卷积,把每块被接受的 token 数再抬 20% 以上</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一句话理解 DFlash2 的位置:<strong>它不是换了一种"猜法",而是把"猜完之后怎么选"这个没人认真优化的环节,用几十万参数级别的极小代价重新设计了一遍</strong>。</p>
+
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+
+            <h3>方案一:加深草稿模型,让模型自己变聪明</h3>
+            <p>块越往后准确率越低,一个直觉解法是加深模型。实验显示 3 层、5 层、15 层的 DFlash 草稿器,在块的第一个位置几乎一样准,越往后差异越大——深度确实能补"后缀衰减",但它是无差别的:十层额外 attention 块给所有位置都加了容量,连本来就没什么可提升的前几个位置也加了,还把 DFlash 最吸引人的效率优势吃掉了一大块(参数 +15.2%)。</p>
+
+            <h3>方案二:用 DSpark / Domino 那种顺序修正头,把每个位置重新预测一遍</h3>
+            <p>这类方法用顺序头逐个重写每个位置的全词表分布,换来块内连贯性,但代价是又引入了自回归式的顺序计算。DFlash2 的核心反论证是:数据里其实已经躺着足够的答案了——DFlash 首选的正确率是 85.4%,但正确 token 出现在前 16 个候选里的概率高达 99.5%。既然答案几乎总在候选列表里,只是"没被选对",那为什么不去"选",而要再去"预测"一遍?</p>
+
+            <h3>方案三:干脆把块变大,一次猜更多</h3>
+            <p>把块从 8 个 token 加到 16 个,看似能一次验证更多——但块末尾的后缀衰减本来就最严重,盲目加大块只会让被砍掉的部分更多。DFlash2 的做法是把"被接受长度"这个真正的优化目标拆成两个可分别修复的问题:选对候选、补上局部依赖。</p>
+
+            <p>💡 <strong>三条路要么加算力、要么加顺序、要么加块长,DFlash2 的关键洞察是——与其让模型"更会猜",不如让系统"更会从已经猜出来的里挑"</strong>。</p>
+
+            <h2 id="xuanze">四、选择器：把对的选择出来</h2>
+            <p>DFlash 的每个位置都会独立给出候选列表,但最终只取首选。DFlash2 发现了一个巨大的"选择空间"。</p>
+            <p><strong>数据说话</strong>:在 GSM8K 上,DFlash 首选正确率(Recall@1)是 85.4%,但正确答案出现在前 16 候选里(Recall@16)的概率是 99.5%。如果有一个"神谕"总能在 top-16 里选对,接受长度会从 4.27 涨到 6.79——<strong>这个 2.5 token 的差距,就是纯纯的"选择余量"</strong>。唯一的问题是:怎么低成本地选出正确的那条路。</p>
+            <p><strong>关键观察:连贯性主要是局部的</strong>。一个候选词合不合适,主要取决于它前面紧挨着的那一个词——所以只需要给相邻词对打分就够了。</p>
+            <p><strong>做法</strong>:每个位置保留 top-16 候选,给所有相邻词对打分。分数由两部分组成——第一部分是 DFlash 自己的 logit(草稿器本来有多喜欢这个词),第二部分问"b 跟在前面的 a 后面顺不顺":A、B 给每个 token 一个 256 维的紧凑嵌入,两个嵌入在一个由上下文门控 H(h_t) 决定的匹配下进行比对。本质上,这是对相邻候选做的低秩双线性注意力。</p>
+            <p><strong>关键:打分完全并行</strong>。所有位置的所有相邻词对一次性算完,不需要额外的骨干网络或 LM-head 前向。唯一顺序化的步骤是最后在预计算好的分数上"走一遍":从最后一个被验证的 token 出发,贪心选择每步的最佳后继;采样版本从同样的分数里采样,再用拒绝采样恢复目标分布的精确性。</p>
+            <table>
+                <thead>
+                    <tr><th>方法</th><th>参数</th><th>延迟</th><th>T=0 接受长度</th><th>T=1 接受长度</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>DFlash(基线)</td><td>—</td><td>—</td><td>4.27</td><td>3.78</td>
+                    </tr>
+                    <tr>
+                        <td>+ DSpark 顺序修正</td><td>+77.8M</td><td>+9.6%</td><td>4.49</td><td>4.08</td>
+                    </tr>
+                    <tr>
+                        <td>+ 路径选择(DFlash2)</td><td>+2.0M</td><td>+0.6%</td><td><strong>4.61</strong></td><td><strong>4.25</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>路径选择让 DFlash 在 T=0 时提升 0.34 个 token、T=1 时提升 0.47,两个设定都打赢了 DSpark 修正——用的却是约 40 分之一的参数、16 分之一的延迟开销。<strong>"选择"比"预测"便宜得多</strong>。而神谕的上限 6.79 说明,这块还有大量可探索的空间。</p>
+
+            <h2 id="juanji">五、卷积：把局部依赖补回来</h2>
+            <p>选择器救不了所有问题,因为还有一块是"候选本身就用完了"——这就是后缀衰减。</p>
+            <p><strong>现象</strong>:Recall 两行都随块位置衰减,连神谕也一样——完美选择下,准确率也会从第一个位置的 99.5% 掉到最后一个的 87.8%。任何选择器都修不了它,因为候选里的正确答案在变少,这是骨干网络的问题。</p>
+            <p><strong>诊断</strong>:DFlash 的 attention 其实承担着两件事——读块前面的上下文,和建模块内部的依赖。但数据显示它花在第二件事上的注意力越来越少:块的注意力占比从 Layer 1 的 30% 掉到 Layer 5 的 8%,剩下的还集中在越来越少的一组注意力头上。于是 DFlash2 的思路是<strong>把两件事拆开:让一个专用模块负责块内工作,attention 专心读上下文</strong>。</p>
+            <p><strong>做法</strong>:插入一个两抽头(two-tap)动态深度卷积,放在每个 attention 和 feed-forward 子层的前后。每个位置把自己的表示和前一个位置的表示混合;第一个位置读的是"最后一个被验证 token"的表示,后面的每个位置读前一个位置的。块内的信息就这样跨越了整个块,而所有位置仍然并行计算。</p>
+            <p><strong>代价极低,收益显著</strong>:只加 1650 万参数(3%),5 层 DFlash + 卷积就逼近 15 层 DFlash 的表现;卷积给草稿–验证周期只增加 0.7% 的延迟,而多加十层 Transformer 要 +15.2%。Layer 4、5 的平均块内注意力占比从 9.4% 掉到 0.5%——说明卷积确实吸收了局部工作,attention 重新专心读上下文。<strong>后缀衰减,本质上是个"局部"问题,一个够到前一个位置的卷积核,就捡回了十层模型买到的大部分收益</strong>。</p>
+
+            <h2 id="shuju">六、数据说话</h2>
+            <p>把选择器和卷积合起来看全貌。在 Qwen3.5-4B 上,DFlash2 在每一份基准上都领先:</p>
+            <table>
+                <thead>
+                    <tr><th>数据集</th><th>MTP</th><th>DFlash</th><th>DSpark</th><th>DFlash 2</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>GSM8K</td><td>4.78</td><td>4.99</td><td>5.69</td><td><strong>6.20</strong></td></tr>
+                    <tr><td>MATH-500</td><td>5.04</td><td>5.42</td><td>6.20</td><td><strong>6.76</strong></td></tr>
+                    <tr><td>HumanEval</td><td>4.84</td><td>5.43</td><td>5.80</td><td><strong>6.28</strong></td></tr>
+                    <tr><td>MBPP</td><td>4.16</td><td>4.49</td><td>4.96</td><td><strong>5.41</strong></td></tr>
+                    <tr><td>MT-Bench</td><td>3.90</td><td>4.26</td><td>4.77</td><td><strong>5.20</strong></td></tr>
+                    <tr><td>平均</td><td>4.54</td><td>4.92</td><td>5.49</td><td><strong>5.97</strong></td></tr>
+                </tbody>
+            </table>
+            <p>平均来看,DFlash2 比 DFlash 多 1.05 个 token(约 21%),比 DSpark 多 0.48。这套升级很便宜:选择器和卷积合计只给 5 层 DFlash 的草稿–验证周期增加 1.3% 的延迟。</p>
+            <p>在更大的 Qwen3.8-27B 上,DFlash2 同样全面领先,且同时打败了模型自带的 MTP 官方路径和社区 DSpark 草稿器——换算成吞吐,Qwen3.8-27B 上是自回归解码的 <strong>2.7–3.4 倍</strong>,Muse Glimmer 上是 <strong>3.1–4.6 倍</strong>。在 MATH-500 上逐位置看,DFlash2 到最后一个位置都能稳在 86% 附近,而所有基线在块尾都比它低 6–9 个点。</p>
+            <p>回到宏观:DFlash 从 2026 年 1 月的论文到七个月后的行业标准,下载超 350 万次,跑进了 SGLang、vLLM、TensorRT-LLM、llama.cpp;NVIDIA 测出 Blackwell 上最高 15× 吞吐,Google 在 TPU 上报 3× token 每秒。DFlash2 是这条线的最新一站:<strong>在同一个设计里,每次验证再多送一个完整 token,几乎免费</strong>。</p>
+
+            <h2 id="kaiyao">七、为什么开发者要懂</h2>
+            <ul>
+                <li>跟<strong>成本与吞吐</strong>的关系:Agent 时代推理是瓶颈,Agent 读、想、调工具,一跑就是几小时甚至几天。DFlash2 在"输出可证明不变"的前提下接近自回归 3 倍解码速度、每 token 约三分之一计算量——对按 token 计费的服务,这是直接的账。</li>
+                <li>跟<strong>推理框架选型</strong>的关系:DFlash2 今天就能在主流引擎里跑——SGLang 一行命令启动,llama.cpp 打一个 PR 的分支,oMLX 有预编译安装包。接入成本低到"改个启动参数",意味着想用几乎不需要做架构决策。</li>
+                <li>跟<strong>架构思想</strong>的关系:"候选路径选择"是个通用的省算力思路——与其让模型更会猜,不如在已有的候选项里选对。这种"用极小的附加模块撬动大收益"的路径,值得任何做推理优化的团队借鉴。</li>
+                <li>跟<strong>本地与边缘</strong>的关系:两抽头卷积是块局部、无状态的,不碰 attention、LM-head 和验证逻辑,直接掉进现有 DFlash 实现——对小显存设备、Apple Silicon 这类"带宽受限"场景尤其友好。</li>
+            </ul>
+
+            <h2 id="wuhu">八、常见误区</h2>
+            <p><strong>误区:DFlash2 改了 DFlash 的输出,不是无损加速。</strong><br>
+            真相:整个方案基于投机解码的拒绝采样框架,输出可证明与自回归解码完全一致;博客强调的 20%+ 收益来自"每轮验证多通过 token",而非改变生成结果。</p>
+            <p><strong>误区:加速比直接等于吞吐倍数。</strong><br>
+            真相:接受长度(每轮被接受的 token 数)是收益的中间指标,换算成真实吞吐还要看并发、批量、硬件和引擎调度;不同场景(批大小 1 的交互式 vs 高并发)收益差异很大。</p>
+            <p><strong>误区:DFlash2 是全新架构,要重写推理栈。</strong><br>
+            真相:选择器和卷积都做成了"Drops into DFlash"式的补丁——不动 attention、LM-head 和验证逻辑,主流引擎已支持或即将支持,接入成本极低。</p>
+            <p><strong>误区:块越大越快。</strong><br>
+            真相:后缀衰减决定了块尾候选质量会耗尽,盲目加大块长会让被砍掉的部分变多;DFlash2 的收益恰恰来自"在每个位置上选出更连贯的路 + 补上局部依赖",而不是无脑加块。</p>
+
+            <h2 id="zongjie">九、总结</h2>
+            <p><strong>给小白的话</strong>:大模型一次只能吐一个词,很慢。投机解码是"派一个小模型先猜一串,大模型一次验收一串"。DFlash 已经让"猜"这一步也变成了整块并行;DFlash2 更进一步——既然猜出的候选里往往藏着正确答案,就加一个几乎不花算力的"挑选器"把对的那条路挑出来,再补一个轻量"接缝器"让块尾的词串得更顺。结果是同样的输出,快 20% 以上。</p>
+            <p><strong>给开发者的话</strong>:如果你在做推理服务、优化成本或研究推理加速,DFlash2 是"选择比预测便宜"这个思路的最新且最能打的实践——候选路径选择 + 块局部卷积,两个加起来 1.3% 的周期延迟代价换 21% 的接受长度提升,这种性价比在推理优化里不多见。</p>
+
+            <p>💡 <strong>当"猜词"已经并行,真正决定收益的是"能不能从猜出来的候选项里挑出那条连贯的路"——选择,比预测便宜得多。</strong><br>
+            <em>(Once guessing is parallel, what decides the payoff is whether you can trace a coherent path through the candidates — choosing is cheaper than predicting.)</em></p>
+
+            <p><strong>参考资料方向</strong>:Inco AI 博客《DFlash 2: Keep Drafting Parallel》(2026-08-18);DFlash 论文《Block Diffusion for Flash Speculative Decoding》(arXiv:2602.06036);NVIDIA 技术博客《Boost Inference Performance up to 15x on NVIDIA Blackwell Using DFlash》(2026-06);LMSYS 博客《The next generation of speculative decoding: DFlash and Spec V2》(2026-06-15);DFlash2 模型卡与 Hugging Face 集合(incoai 组织);DSpark、Domino、Canon Layers、Dynamic Short Convolutions 等相关论文。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="dsh.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">🧩 DSH</span>
+                    </span>
+                </a>
+                <a href="frontier.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">返回专题</span>
+                        <span class="nav-title">🔭 Frontier</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
