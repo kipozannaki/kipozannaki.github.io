@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：Flash Wars（沿用 dflash2.html 范式） -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Wars · kipozannaki</title>
+    <meta name="description" content="8 月最后一周三强对撞：GLM-5.3-Flash（线性+稀疏注意力）、DeepSeek-V4-Flash-Vision-Exp（给翻盘的底座装上眼睛）、Qwen3.8-Flash-Next（Qwen4 架构拆盲盒）。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>⚔️ Flash Wars</h1>
+            <p class="meta">GLM-5.3-Flash vs DeepSeek-V4-Flash-Vision-Exp vs Qwen3.8-Flash-Next：三家公司挤在同一个月交卷,交出的是三种完全不同的省钱哲学——Flash 不再是缩小版旗舰,而是一种新物种。</p>
+        </header>
+        <div class="article-body">
+
+            <blockquote>目录：<a href="#yinyan">一、引言</a> · <a href="#zuobiao">二、坐标</a> · <a href="#jianhua">三、为什么不能用更简单的方案</a> · <a href="#glm">四、GLM 篇：先吃螃蟹的混合注意力</a> · <a href="#deepseek">五、DeepSeek 篇：底座先翻盘,再把眼睛补上</a> · <a href="#qwen">六、Qwen 篇：把下一代架构提前拆盲盒</a> · <a href="#shuju">七、数据说话</a> · <a href="#qushi">八、共同的路线图</a> · <a href="#kaiyao">九、为什么开发者要懂</a> · <a href="#wuhu">十、常见误区</a> · <a href="#zongjie">十一、总结</a></blockquote>
+
+            <h2 id="yinyan">一、引言</h2>
+            <p>先问几个听起来很简单、实际上没那么简单的问题:</p>
+            <ul>
+                <li>2026 年 7 月底到 8 月底的这一个月里,三大厂商挤在一起发布了三个都叫「Flash」的模型——Flash 到底是什么的缩写,还是一整个新物种的名字?</li>
+                <li>GLM-5.3-Flash 总参数比上一代旗舰还小一点,激活参数砍半、层数砍半,为什么能力反而更强、价格只有前代的 1/10?「Flash 不再只是把旗舰模型简单缩小」这句话到底怎么理解?</li>
+                <li>DeepSeek 的 Harness 开源不到一周,GitHub 讨论区最高频的问题竟是「怎么让 DeepSeek 看图」——被逼出来的 V4-Flash-Vision-Exp 文本一分不掉、看图直追 Opus,补短板为什么这么快,快得像是早有准备?</li>
+                <li>Qwen 敢把下一代架构提前开源「拆盲盒」,还额外塞了 51B 参数专门放在内存里、不进 GPU 的矩阵乘——这种「不参与计算的大字典」是什么新思路?</li>
+                <li>三家的注意力设计表面完全不同(KDA+DSA、GDN+QSA、CSA+HCA 底座),为什么混合层数比例不约而同收敛到 3:1?这是巧合,还是行业已经摸到的共同最优解?</li>
+            </ul>
+            <p>这些问题背后,指向的是同一个判断:<strong>2026 年 8 月,国产模型的价格战打完了上半场(谁便宜),下半场的战场换成了「单位智能的成本曲线」加「谁的眼界更广」——三家不约而同把激活参数压到 6B–18B 区间、用混合注意力驯服长上下文的二次复杂度、全员交出了能看图的多模态答卷。「Flash」从此不再是缩水版的意思,而是一类重新设计的模型:总参数给能力兜底,激活参数给成本兜底</strong>。</p>
+
+            <h2 id="zuobiao">二、坐标</h2>
+            <p>本文是一次横向对比,理解它在整个知识体系里的位置,要先划清几条边界:</p>
+            <table>
+                <thead>
+                    <tr><th>概念</th><th>关注的问题</th><th>跟本文的区别</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Frontier·DFlash2</td>
+                        <td>解码层加速:同一份输出,让投机解码每轮验证多通过 token</td>
+                        <td>DFlash2 在「生成之后」提速,本文三家在「架构本身」把每个 token 的成本打下来;两者互补——低激活 + 混合注意力的 Flash 模型,正是块扩散投机解码最理想的落地宿主</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·Long Thinking</td>
+                        <td>测试时算力换质量,思考链越来越长</td>
+                        <td>思考链越长,上下文压力越大——这正是三家不约而同把 1M 上下文和长序列效率(CSA/HCA、IndexPool、QSA 微块)当第一卖点的上游原因</td>
+                    </tr>
+                    <tr>
+                        <td>Frontier·DSH</td>
+                        <td>Agent 执行层的插件化底座:「想得对」之后怎么「干得成」</td>
+                        <td>DSH 开源当周,GitHub 讨论区最高频的问题是「怎么让 DeepSeek 看图」——直到 Vision-Exp 上线,模型层才补齐这块感知拼图;执行层的插件化与感知层的多模态,正是同一套 Agent 叙事的两半</td>
+                    </tr>
+                    <tr>
+                        <td>Local AI Engineering</td>
+                        <td>本地部署的显存、量化与推理引擎选型</td>
+                        <td>激活 6B ≠ 本地能跑:Qwen FP8 权重约 168GB,GLM 320B,BF16 GGUF 更大;N-gram 可放内存的设计才是真正为「带宽受限设备」准备的新思路,本地实操专题会接着展开</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>一句话理解本文的位置:<strong>它不是三篇独立评测的拼盘,而是把三条路线放在同一张桌子上,看 2026 年的头部玩家如何各自回答同一道题——「前沿能力,怎么卖到人人用得起」</strong>。</p>
+
+            <h2 id="jianhua">三、为什么不能用更简单的方案</h2>
+
+            <h3>方案一:继续堆参数,总参和激活一起涨</h3>
+            <p>这是 2023–2025 年的主流打法,但边际收益已经崩塌。反证就在这三家里:GLM 相比 GLM-4.5 总参数几乎没变(355B→320B)、激活从 32B 砍到 18B、层数从 92 减到 45,能力反而更强;Qwen 用相当于上代 Plus 约 1/9 的训练成本,在编程和办公任务上全面超过 397B/17B 激活的前代。<strong>堆参数的路线没有死,但「单位算力换来的智能」这条曲线已经被刻意做弯了——容量留给 MoE 专家池和非常规参数(N-gram),计算量留给稀疏化和低激活</strong>。</p>
+
+            <h3>方案二:把旗舰蒸馏成小模型,直接卖便宜货</h3>
+            <p>蒸馏路线的问题在于砍掉的不只是计算,还有能力上限。三家的公开表态高度一致:智谱明确说这次「不再只是把旗舰模型简单缩小,而是从架构层面重新设计了推理成本」;DeepSeek 走得更极端——Flash 底座和 Pro 是同期设计的两个规格,不是大小号关系;<strong>「Flash」的新定义是成本结构不同的另一颗模型树,不是旗舰的低配版</strong>。</p>
+
+            <h3>方案三:不折腾了,直接调闭源旗舰 API</h3>
+            <p>闭源旗舰当然强,但价格是 OpenAI/Anthropic 定的:Opus 4.8 的 AA Intelligence Index 拿 57 分,标准价输入 $5/输出 $25 每百万 token;GLM-5.3-Flash 同样拿 57 分,综合价格约为它的 1/40。<strong>当开源模型在同一能力区间把价格压掉一到两个数量级,「只能用闭源」就不再是技术判断,而是习惯问题</strong>。更何况 Qwen 的 API 直接兼容 Anthropic 协议,Claude Code 换个环境变量就能接。</p>
+
+            <p>💡 <strong>三条旧路的共同问题是:它们都在「既定架构 × 既定价格带」里做选择。三个 Flash 的共同点是换掉了第一项——先把架构的成本结构重写,再谈能力对标</strong>。</p>
+
+            <h2 id="glm">四、GLM 篇：先吃螃蟹的混合注意力</h2>
+            <p><strong>先讲个侦探故事</strong>:8 月 20 日,OpenCode 和 OpenRouter 上出现了一个叫 Ox Alpha 的无主免费模型,1M 上下文、支持图像视频输入。独立研究者靠指纹式分析 tokenizer、跑压缩率对比,高置信度锁定它是智谱 GLM 家族成员。六天后的 8 月 26 日晚,智谱官宣:Ox Alpha 就是 GLM-5.3-Flash,匿名是为了拿真实世界的反馈。测试期间它成了当周最受欢迎的模型,创下两个平台调用量新高——<strong>而这全部流量,由超过 10 万张国产芯片组成的集群承载</strong>,这也是国产算力第一次直接扛住全球开发者的真实线上负载。</p>
+            <p><strong>架构上最大的赌注:第一个把「线性注意力 + 稀疏注意力」做进开源前沿模型的玩家</strong>。分工干净利落——34 层 KDA(Kimi Delta Attention,线性注意力)用递归状态建模处理局部依赖,不动 KV 缓存;11 层 DSA(稀疏注意力,MLA 变体,kv_lora_rank 512,全模型彻底不用 RoPE)通过一个轻量的 Lightning Indexer(32 头,topk 2048)在长上下文里召回真正需要全局计算的 token。配比恰好 3:1。</p>
+            <p><strong>IndexPool 解决索引器自己的开销</strong>:稀疏检索本身也要存索引向量,1M 上下文下这个开销不可忽略——智谱用加权池化把索引器的 4 个 KV 向量压缩成 1 个,效果是注意力计算量较 GLM-5.3 降低 3.01 倍,KV 缓存降低 4.44 倍。<strong>诚实的短板也公开承认了:KV 绝对值仍略大于 DeepSeek-V4-Flash 和 Kimi-K3,官方自己说留有改进空间</strong>。</p>
+            <p><strong>MoE 与训练配方</strong>:288 个路由专家 + 1 个共享专家,top-8 激活,sigmoid 门控;30T token 多模态语料预训练,mHC 流形约束超连接稳住训练。相比 GLM-4.5(355B/32B/92 层),总参相近但激活减半、深度减半——<strong>故意把模型做「瘦」,再用更富的配方补回能力</strong>。</p>
+            <p><strong>服务侧同样重写</strong>:基于 SGLang 自研引擎,节点内张量并行、W8A8 量化、INT8/FP8/BF16 混合缓存量化、Layer Split——一句话概括是「以算力换带宽、以通信换显存」;集群层面把多模态编码、Prefill、Decode 拆成三个可独立扩缩容的工作池(EPD 分离)。相比同硬件初始基线,端到端性能提升 3 倍。价格阶梯:GLM-5.3 的 1/10,限时折扣 1/20,Opus 4.8 的约 1/40。</p>
+
+            <h2 id="deepseek">五、DeepSeek 篇：底座先翻盘,再把眼睛补上</h2>
+            <p><strong>故事的起点是一场尴尬</strong>:8 月 13 日 DeepSeek 开源 Harness 时,自家模型在模型目录里还声明为纯文本——开发者上传图片只会收到一句 <code>MODEL_DOES_NOT_SUPPORT_IMAGES</code>。GitHub 讨论区一夜之间被「怎么让 DeepSeek 看图」刷屏,大家只能自己搭桥:或者在前面接一个 Qwen-VL 之类的小视觉模型把图翻译成文字再喂进去,或者给 Harness 写 vision bridge 插件,社区甚至专门起了个开源项目叫 dsh-deepseek-vision。一家刚把 Agent 执行层武装到牙齿的公司,在最基础的感知入口上是缺位的。</p>
+            <p><strong>但这次升级的伏笔其实早就埋好了——底座本身,已经在 7 月 31 日靠着纯后训练翻盘过一轮</strong>:Agent 场景海量 SFT + 偏好优化,「分化再统一」两步走(先按场景做专家化训练 Split Specialist Training,再用在线策略蒸馏 OPD 拉通)让 TerminalBench 2.1 从 70 出头跳到 82.7、Cybergym 76.7,反超自家还没正式发布的 Pro Preview;配套的 FP4 量化感知训练、百万上下文 RL 框架、Agentic AI 沙箱这些基建也全部就绪。所以 8 月 21 日登上舞台的 DeepSeek-V4-Flash-Vision-Exp 不是从零起高楼,<strong>而是给一栋已经封顶的大楼装窗户</strong>。</p>
+            <p><strong>它的能力结构泾渭分明:两条线分开看</strong>。纯文本能力与 0731 正式版基本持平——Terminal-Bench 83.9(旧版 82.7)、DeepSWE 59.3,加眼睛没有伤文字功力;但凡任务需要「看懂图」,成绩立刻起飞:ApexBench 从 26.2 跳到 36.5(整整 10 分,「看截图干 Agent 活」这条路真通了)、Agents' Last Exam 27.3 直接反超 Opus-4.8 的 25.7、ZeroBench 35.0 压过 Opus 的 34.0、Chartography 64.3 距离 Opus 的 65.0 只差 0.7——官方口径就是「多模态 Agent 能力接近 Opus-4.8」。</p>
+            <p><strong>但有一层窗户纸要点破:这不是一次原生统一的多模态训练</strong>。DeepSeek 未公布参数规模、技术报告与视觉侧训练细节;从发布节奏(Harness rc.8 先悄悄加上「适配器支持配置启用原生图片请求」,官方视觉模型一周后到货)到上线首日的实测细节(最初 image_url 请求仍返回 expected 'text',当晚才放开),都指向更可能的方案——<strong>把现成的视觉编码/OCR 模块接到 V4-Flash 前面,由文本底座完成推理</strong>。能用、便宜、快,但与 Gemini/GPT 那种预训练阶段就图文混训的「原生统一」路线相比,还有一段架构距离。</p>
+            <p><strong>真正杀疯的是价格牌</strong>:图片不按张收钱、不搞像素溢价,而是按尺寸折算成 token——单张至多 384 个(对比 GPT/Claude 处理同等分辨率通常吃掉 800–1100 token),费率与文本完全一致,高峰时段算下来一张图约千分之一元。配套的 Files API 免费开放:上传一次拿 file_id,后续请求随便引用,批量场景直接省带宽。接口面也很全:Chat Completions / Messages / Responses 三种格式、兼容 Anthropic 协议、支持 JSON Output 与 Tool Calls,1M 上下文、最大输出 384K。</p>
+            <p><strong>定位要说清楚:名字里的 exp 就是「官方内测」</strong>——迭代快、不承诺长期稳定,原型验证极香,别放生产主链路。另外注意,DeepSeek 8 月初已预告 API 整体调价,价格表切成了闲时/高峰双轨:「低价抢量」阶段正式结束,转向规模与盈利平衡——而这一步恰好撞上千问以低 33% 的报价贴身跟进,价格对撞进入下半场。</p>
+
+            <h2 id="qwen">六、Qwen 篇：把下一代架构提前拆盲盒</h2>
+            <p><strong>玩法复刻了自家的成功剧本</strong>:当年 Qwen3-Next 先放出实验架构,后来整套 Qwen3.5–3.8 全线沿用;这次的 Qwen3.8-Flash-Next 就是 Qwen4 架构的第一个开源权重预览——千问团队原话说得很直白:提前释出结构改动,是为了在发布完整家族之前让社区先检验。规格激进:语言模型部分 125B 总参、每 token 只激活 6B;额外挂载 51B 的 N-gram 嵌入和 4B 的 MTP 多 token 预测模块;48 层,按 12 组循环排布,每组 3 个 Gated DeltaNet 层配 1 个 QSA 稀疏注意力层——又是 3:1;MoE 是 512 选 10+1 共享。</p>
+            <p><strong>四个新组件各管一件事</strong>:</p>
+            <ul>
+                <li><strong>QSA(Qwen Sparse Attention)</strong>:以微块为单位选择 token 参与全注意力,显著降低长上下文延迟——和 GLM 的索引器、DeepSeek 的 CSA 是同一个问题的三种解法。</li>
+                <li><strong>Gated Residual</strong>:残差流加宽成 4 分支,逐元素读门控制读什么、逐分支写门控制写什么——信息跨层流动从「一股脑全加」变成「精细分账」,推理开销很低。</li>
+                <li><strong>N-gram 嵌入(本篇最有想象力的一手)</strong>:51B 参数做成「短语字典」,按短 n-gram 索引确定性寻址——它像一个共享参考书架,任何专家都能翻一眼但不用挂号,<strong>关键是可以常驻普通内存而不占显存,以远低于 MoE 的代价扩容参数轴</strong>,专治内存受限的加速器。</li>
+                <li><strong>训练配方</strong>:Muon 和 AdamW 按权重类别分别分配,并依据重新拟合的缩放律干脆取消 batch size 预热——直接以目标 batch 开训。最终训练开销仅约上代 Plus 的 1/9。</li>
+            </ul>
+            <p><strong>成绩与商务</strong>:编程上 DeepSWE 58.7、SWE-bench Pro 62.5 双双领先 DeepSeek-V4-Flash 与 Opus 4.6;办公长任务 CoWorkBench 73.9 对 DeepSeek 的 45.1 接近翻倍;GPQA Diamond 91.7、LiveCodeBench v6 91.9;HLE 35.9 仍输 Opus 4.6 的 40.0。API 版 Qwen3.8-Flash 定价 $0.16/$0.47(约 ¥1/¥3)每百万 token,只有自家旗舰 Max 的 1/12,且兼容 OpenAI 与 Anthropic 双协议。需要注意许可证是定制的 qwen-community-1.0,不是 Apache 2.0,商用前要读条款。</p>
+
+            <h2 id="shuju">七、数据说话</h2>
+            <p>先看架构与成本结构,再看成绩。所有分数均为厂商自报口径、评测工具并不完全一致,跨列直接比较大小时请注意:</p>
+            <table>
+                <thead>
+                    <tr><th>维度</th><th>GLM-5.3-Flash</th><th>DeepSeek-V4-Flash-Vision-Exp</th><th>Qwen3.8-Flash-Next</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>总参 / 激活</td>
+                        <td>320B / 18B</td>
+                        <td>284B / 13B(视觉版共享底座,未单独披露)</td>
+                        <td>125B / 6B(+51B N-gram,+4B MTP)</td>
+                    </tr>
+                    <tr>
+                        <td>层数与注意力混合比</td>
+                        <td>45(+1 MTP);34 KDA : 11 DSA ≈ 3:1</td>
+                        <td>沿 V4 底座(CSA + HCA + SWA);视觉模块未公开</td>
+                        <td>48;36 GDN : 12 QSA = 3:1</td>
+                    </tr>
+                    <tr>
+                        <td>MoE 配置</td>
+                        <td>288 选 8 + 1 共享</td>
+                        <td>沿 V3 系 DeepSeekMoE 设计</td>
+                        <td>512 选 10 + 1 共享</td>
+                    </tr>
+                    <tr>
+                        <td>上下文</td>
+                        <td>原生 1M</td>
+                        <td>1M(最大输出 384K;FLOPs 为 V3.2 的 27%、KV 为 10%,沿底座)</td>
+                        <td>原生 262K,YaRN 扩展至 1M</td>
+                    </tr>
+                    <tr>
+                        <td>模态</td>
+                        <td>文本 + 图像 + 视频(原生)</td>
+                        <td>文本 + 图像(Vision-Exp,实验性)</td>
+                        <td>文本 + 图像</td>
+                    </tr>
+                    <tr>
+                        <td>优化器</td>
+                        <td>mHC + 稳定化配方(未披露细节)</td>
+                        <td>Muon 全面替代 AdamW</td>
+                        <td>Muon + AdamW 按权重类别混用</td>
+                    </tr>
+                    <tr>
+                        <td>开源协议</td>
+                        <td>MIT</td>
+                        <td>MIT</td>
+                        <td>qwen-community-1.0(定制)</td>
+                    </tr>
+                    <tr>
+                        <td>API 价格(每百万 token)</td>
+                        <td>约为 Opus 4.8 的 1/40</td>
+                        <td>闲时/高峰双轨:命中 ¥0.05–0.10、未命中 ¥1.5–3、输出 ¥4.5–9;图片单张折算至多 384 token,约千分之一元</td>
+                        <td>$0.16 输入 / $0.47 输出(≈¥1/¥3)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table>
+                <thead>
+                    <tr><th>基准(厂商口径)</th><th>GLM-5.3-Flash</th><th>DS-V4-Flash-Vision-Exp</th><th>Qwen3.8-Flash-Next</th><th>参考:Opus 4.8</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Terminal-Bench 2.1(终端操作)</td><td><strong>84.3</strong></td><td>83.9</td><td>—(数据缺失)</td><td>85.0</td></tr>
+                    <tr><td>DeepSWE 1.1</td><td><strong>63.4</strong></td><td>59.3</td><td>58.7</td><td>58.0</td></tr>
+                    <tr><td>SWE-bench Pro</td><td>—(数据缺失)</td><td>56.0**(底座 0731)</td><td><strong>62.5</strong></td><td>53.4**(为 4.6)</td></tr>
+                    <tr><td>LiveCodeBench v6</td><td>—(数据缺失)</td><td>90.6**(底座 0731)</td><td><strong>91.9</strong></td><td>88.8**(为 4.6)</td></tr>
+                    <tr><td>GPQA Diamond</td><td>—(数据缺失)</td><td>90.8**(底座 0731)</td><td><strong>91.7</strong></td><td>91.3**(为 4.6)</td></tr>
+                    <tr><td>HLE</td><td>—(数据缺失)</td><td>33.8**(底座 0731)</td><td>35.9</td><td>40.0**(为 4.6,仍领先)</td></tr>
+                    <tr><td>ApexBench(Pass@1,看图干活)</td><td>—(数据缺失)</td><td><strong>36.5</strong>(0731 为 26.2)</td><td>—(数据缺失)</td><td>39.4</td></tr>
+                    <tr><td>AutomationBench(GUI 自动化)</td><td><strong>48.8</strong></td><td>38.8</td><td>—(数据缺失)</td><td>41.0</td></tr>
+                    <tr><td>Agents' Last Exam</td><td>26.3*</td><td><strong>27.3</strong>(反超基线)</td><td>24.3*(Score 口径 51.2)</td><td>25.7 / 27.0†</td></tr>
+                    <tr><td>Toolathlon Verified</td><td><strong>78.4</strong></td><td>70.3**</td><td>73.5</td><td>76.2</td></tr>
+                    <tr><td>Chartography(视觉 Agent,p0.95)</td><td>—(数据缺失)</td><td><strong>64.3</strong></td><td>—(数据缺失)</td><td>65.0</td></tr>
+                    <tr><td>ZeroBench(Pass@5)</td><td>—(数据缺失)</td><td><strong>35.0</strong>(反超基线)</td><td>—(数据缺失)</td><td>34.0</td></tr>
+                </tbody>
+            </table>
+            <p>注:所有分数均来自各厂商公布的对照表——<strong>*</strong> 表示厂商自报、测试框架(harness)互不通用;<strong>**</strong> 表示该格数字取自另一张表的口径:DeepSeek 列的 SWE-bench Pro / LiveCodeBench / GPQA / HLE 来自其纯文本底座 0731 正式版(官方明确 Vision-Exp 文本能力与其持平),AutomationBench / Toolathlon 则分别引自 GLM 与 Qwen 的对照表;<strong>†</strong> 表示两家厂商对同一条 Opus 基线各自报了不同的数(25.7 vs 27.0)。带「数据缺失」格表示该厂未公布此基准,<strong>不等于落后</strong>。能确定的三件事:GLM 在自报的 Agent 套件上全面逼近或超过 Opus 4.8(唯 NL2Repo 大幅落后 56.3 vs 69.7);DeepSeek 文本不动、靠视觉直接踩进 Opus 的得分带(ApexBench +10.3、ALE 与 ZeroBench 反超、Chartography 差 0.7);Qwen 用 1/9 训练成本在自己的表格里多数项目登顶。<strong>没有人公布过一个三家同场的横评——真正的第三方交叉验证仍然缺位</strong>。</p>
+
+            <h2 id="qushi">八、共同的路线图</h2>
+            <p>表面是竞争,底层是五条正在收敛的行业共识:</p>
+            <ul>
+                <li><strong>混合注意力成为默认架构</strong>:三条实现路径(GDN+QSA 微块、KDA+DSA+Indexer、CSA+HCA)本质都是「递归/压缩状态管局部,稀疏检索管全局」,且层数配比都落在 3:1——这大概率不是巧合,而是当前训练配方下的甜点位。</li>
+                <li><strong>激活参数竞赛下探</strong>:18B → 13B → 6B。总参数继续上涨当「能力保险」,激活才是计费单元;N-gram 这类「不进矩阵乘的参数」开辟了第三条扩展轴。</li>
+                <li><strong>Muon 正在接管训练</strong>:DeepSeek 全量采用,Qwen 分类混用——AdamW 作为大模型默认优化器的时代进入倒计时。</li>
+                <li><strong>Agent 是后训练的主战场,视觉是新开的战线</strong>:DeepSeek 先用纯后训练把文本 Agent 抬进自家旗舰区间,再用 Vision-Exp 把「会看截图干活的 Agent」补到 Opus 身边;三家评测清一色围绕终端操作、软件工程、GUI 办公——「会聊天」不值钱,「看得见又干得成」才标价。</li>
+                <li><strong>节奏与价格互相咬死</strong>:8/20 匿名 Ox Alpha 上线、8/21 DeepSeek 补眼、8/26 智谱千问同夜双发——四周之内四次响枪,每次定价都精确对着上一家再砍一刀(Qwen 明确对 DeepSeek 输入输出各低 33%,DeepSeek 把看图价格压到每张约千分之一元)。上半场卷 API 单价,下半场已经开卷「单位智能成本」。</li>
+            </ul>
+            <p>💡 <strong>「Flash」的含义在 2026 年 8 月发生了漂移:从「旗舰的小杯」变成「按成本结构反向设计的前沿模型」——先定「每个 token 花多少 FLOPs」,再让能力去填这个预算</strong>。</p>
+
+            <h2 id="kaiyao">九、为什么开发者要懂</h2>
+            <ul>
+                <li>跟<strong>选型</strong>的关系:大规模 Agent 调用三者都能打,差异在生态——要视频理解和 MIT 协议选 GLM;要百万上下文、最便宜的「看图」(单张至多 384 token)和 Anthropic 协议兼容选 DeepSeek(但 exp 后缀意味着别放生产主链路);要把 Claude Code/Codex 无缝切过来、或需要部署在自己机房看显存预算选 Qwen(注意定制协议)。单卡小显存的「真本地」需求依然属于 Qwen3.8-27B 这个级别,别被「6B 激活」误导。</li>
+                <li>跟<strong>成本核算</strong>的关系:三家的定价逻辑已经分化出「缓存命中价」「非高峰折扣」「评分制配额」等花样——同等预算下的实际吞吐差距可能再有一倍以上,按自己的流量画像算账,不要只看牌面单价。</li>
+                <li>跟<strong>技术趋势</strong>的关系:这一个月基本宣告两件事尘埃落定——纯 dense 长上下文模型出局,Muon 进入主流训练栈。下一轮选址能力时,这两条可以直接写进需求文档。</li>
+                <li>跟<strong>下游配合</strong>的关系:如 DFlash2 一篇所述,投机解码对草稿器的要求恰是「小而快」——Flash 系模型的低激活分支天然适合当草稿,两者叠满收益值得实测。</li>
+            </ul>
+
+            <h2 id="wuhu">十、常见误区</h2>
+            <p><strong>误区:「激活 6B/13B/18B」意味着消费级显卡就能跑。</strong><br>
+            真相:激活参数决定计算量,不决定显存占用——320B 权重、1M KV 缓存、168GB 的 FP8 权重文件都在那里。真能塞进单卡的是另一个量级的模型;Flash 系的目标是「API 便宜十万倍调用」,不是「笔记本上跑」。</p>
+            <p><strong>误区:三家都用「混合注意力」,所以架构差不多。</strong><br>
+            真相:只在「局部递归 + 全局稀疏」的战略层相似;战术层完全不同——KDA 是带门控的线性递归且全程无 RoPE,QSA 按 micro-block 选择,CSA/HCA 是压缩式。复现或微调时的坑完全不一样(llama.cpp 社区光是实现 Indexer 的「按整池选择而非按格子选择」就踩出一个 Jaccard 指标根本看不出来的 bug)。</p>
+            <p><strong>误区:Vision-Exp 和 Gemini/GPT 一样是原生统一的多模态模型。</strong><br>
+            真相:DeepSeek 未公布参数与技术报告;从发布节奏(Harness 先改适配器再放模型)和实测线索(image_url 一度返回 expected 'text')看,更可能是「视觉编码器前置 + 文本底座推理」的外挂式方案——能用、便宜,但与原生图文混训的深度融合还有距离。</p>
+            <p><strong>误区:某家 benchmark 表全面领先,就直接选那家。</strong><br>
+            真相:所有数字均为厂商自报、harness 不互认、HLE/NL2Repo 这类最难的项目上没有一家接近闭源顶级;且各家没公布的基准大概率就是弱项。正确姿势是用自己的真实 workload 各跑一周。</p>
+            <p><strong>误区:DeepSeek 后训练就能涨这么多、视觉一周就上线,说明架构不重要。</strong><br>
+            真相:恰恰相反——后训练的巨大增益建立在 V4 架构提前铺好的路上(百万上下文 RL 框架、FP4 训练基建都是架构期的产物),Vision-Exp 的「一周装好眼睛」同样依赖 Harness 先完成的模态改造。<strong>架构搭台,后训练唱戏,缺一角都不成立</strong>。</p>
+
+            <h2 id="zongjie">十一、总结</h2>
+            <p><strong>给小白的话</strong>:这三家像是同一个班的三种学霸——GLM 换了全新的学习方法(线性+稀疏注意力),还全部用国产芯片上课;DeepSeek 学习方法没变,先疯狂刷题刷对了方向(Agent 后训练),又给自己配上眼镜(Vision-Exp),看图干活的成绩直逼隔壁最贵那位;Qwen 提前把下学期课本(Qwen4 架构)发给你看,还附赠一本放在图书馆随时能查的短语词典(51B N-gram 内存字典)。三个人都比国外最贵的那个学生便宜几十倍。</p>
+            <p><strong>给开发者的话</strong>:这一轮的意义不在某次 benchmark 的输赢,而在四个信号已经同时亮灯:混合注意力成为长上下文标配、激活参数进入个位数时代开始计价、后训练能把轻量型号抬进旗舰区间、多模态成了 Flash 的出厂标配而非选配。无论你用哪家的 API,「按激活成本选型、按看得见的 Agent 任务验收」会是接下来一年的主旋律。</p>
+
+            <p>💡 <strong>同一顶「Flash」帽子下藏着三种省钱哲学——竞争的终点不是谁更像旗舰,而是谁的「单位智能成本曲线」最先压穿对手。</strong><br>
+            <em>(Under the same "Flash" hat sit three philosophies of saving compute — the race isn't about who looks most like a flagship, but whose cost-per-unit-intelligence curve undercuts the others first.)</em></p>
+
+            <p><strong>参考资料方向</strong>:Z.ai 官方博客《GLM-5.3-Flash》(2026-08-26)及 llama.cpp PR #27754 架构逆向(KDA 门控/Lightning Indexer/IndexPool 细节);DeepSeek-V4 技术报告(arXiv:2606.19348)、《DeepSeek-V4-Flash-Vision-Exp Release》官方公告(api-docs.deepseek.com,2026-08-21)、腾讯新闻《DeepSeek 终于长出“眼睛”》与腾讯云开发者社区深度解读;Qwen 团队《Qwen3.8-Flash-Next》技术报告与模型卡(GitHub/Hugging Face/ModelScope);36氪《智谱「牛来」模型算力谜底》、智东西《千问智谱连夜开源》等报道;the-decoder、dev.to 相关英文报道。再次提醒:文中基准全部为厂商自报口径。</p>
+
+            <!-- 跨文章导航：上一站 + 下一站 -->
+            <nav class="article-nav">
+                <a href="dflash2.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一站</span>
+                        <span class="nav-title">⚡ DFlash2</span>
+                    </span>
+                </a>
+                <a href="frontier.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">返回专题</span>
+                        <span class="nav-title">🔭 Frontier</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器（兼容老 webview） -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
