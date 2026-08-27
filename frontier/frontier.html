@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Frontier & Emerging Research 专题页：14 篇（2026-08-20 增 DSH / DFlash2） -->
+<!-- Frontier & Emerging Research 专题页：15 篇（2026-08-27 增 Flash Wars） -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -36,7 +36,7 @@
 
     <section class="hero-compact">
         <h1>Frontier & Emerging Research</h1>
-        <p>AI 前沿研究：跟着论文走 · 14 篇笔记（2026-08-20 增 DSH / DFlash2）</p>
+        <p>AI 前沿研究：跟着论文走 · 15 篇笔记（2026-08-27 增 Flash Wars）</p>
     </section>
 
     <div class="site-layout">
@@ -65,22 +65,23 @@
                 <a href="global-workspace.html" class="sidebar-item" title="Global Workspace"><span class="icon">🪞</span><span class="text">Global Workspace</span></a>
                 <a href="dsh.html" class="sidebar-item" title="DSH"><span class="icon">🧩</span><span class="text">DSH</span></a>
                 <a href="dflash2.html" class="sidebar-item" title="DFlash2"><span class="icon">⚡</span><span class="text">DFlash2</span></a>
+                <a href="flash-wars.html" class="sidebar-item" title="Flash Wars"><span class="icon">⚔️</span><span class="text">Flash Wars</span></a>
             </div>
         </aside>
 
         <main>
             <section class="section">
                 <h2>🔭 专题说明</h2>
-                <p>这一专题不追求体系完整，追求跟得上节奏——聚焦"AI 现在最前沿在探索什么"，内容会跟着最新论文和产业动态持续更新，不像 Application / Foundation 两个专题那样有一套稳定不变的知识体系：</p>
+                <p>这一专题不追求体系完整，追求跟得上节奏——聚焦\"AI 现在最前沿在探索什么\"，内容会跟着最新论文和产业动态持续更新，不像 Application / Foundation 两个专题那样有一套稳定不变的知识体系：</p>
                 <ul>
                     <li><strong>推理范式的工程实现</strong>　o1 / r1 这类具体推理模型是怎么被训练和部署出来的</li>
-                    <li><strong>算力换智能</strong>　Test-Time Compute、Inference Scaling，把"多算一会儿"变成一种可以量化的能力提升手段</li>
+                    <li><strong>算力换智能</strong>　Test-Time Compute、Inference Scaling，把\"多算一会儿\"变成一种可以量化的能力提升手段</li>
                     <li><strong>搜索与规划</strong>　Tree Search、MCTS 在生成式模型里的具体应用</li>
                     <li><strong>新的训练信号</strong>　RLVR（可验证奖励的强化学习）这类正在被验证的对齐新思路</li>
                     <li><strong>超越单轮问答</strong>　World Model、Agent Memory，让模型具备更长时间尺度的状态和推演能力</li>
                     <li><strong>多模态与协作协议</strong>　Multimodal Agent、A2A、MCP Evolution，模型之间、模态之间怎么互相协作</li>
                 </ul>
-                <p class="note"><strong>一个需要先说清楚的边界</strong>：Foundation 专题里有一篇 Reasoning，讲的是"为什么模型能/不能推理"这种机制层面的问题；这里的 <strong>Reasoning Model</strong> 讲的是 o1 / r1 这类具体推理范式，工程上到底是怎么被训练和实现出来的——两篇不是同一件事，各自讲各自的层次。</p>
+                <p class=\"note\"><strong>一个需要先说清楚的边界</strong>：Foundation 专题里有一篇 Reasoning，讲的是\"为什么模型能/不能推理\"这种机制层面的问题；这里的 <strong>Reasoning Model</strong> 讲的是 o1 / r1 这类具体推理范式，工程上到底是怎么被训练和实现出来的——两篇不是同一件事，各自讲各自的层次。</p>
             </section>
 
             <section class="section">
@@ -89,12 +90,12 @@
                     <a href="reasoning-model.html" class="article-card">
                         <div class="article-icon">🧠</div>
                         <h3>Reasoning Model</h3>
-                        <p>为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
+                        <p>为什么 o1 / r1 这类模型要先\"想\"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
                     </a>
                     <a href="test-time-compute.html" class="article-card">
                         <div class="article-icon">⏱️</div>
                         <h3>Test-Time Compute</h3>
-                        <p>为什么同一个模型多问几次投票选答案，正确率能明显提升？一篇讲清"花测试时算力"到底有哪些具体方法，以及为什么不是越多越好。</p>
+                        <p>为什么同一个模型多问几次投票选答案，正确率能明显提升？一篇讲清\"花测试时算力\"到底有哪些具体方法，以及为什么不是越多越好。</p>
                     </a>
                     <a href="inference-scaling.html" class="article-card">
                         <div class="article-icon">📈</div>
@@ -104,27 +105,27 @@
                     <a href="mcts-tree-search.html" class="article-card">
                         <div class="article-icon">🌳</div>
                         <h3>MCTS / Tree Search</h3>
-                        <p>为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比"多次采样投票"更聪明地花算力。</p>
+                        <p>为什么下棋 AI 里的搜索算法，被搬来给语言模型做推理？一篇讲清 MCTS 怎么比\"多次采样投票\"更聪明地花算力。</p>
                     </a>
                     <a href="rlvr.html" class="article-card">
                         <div class="article-icon">🎯</div>
                         <h3>RLVR</h3>
-                        <p>为什么训练推理模型不用人类偏好打分，改用"答案对不对"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
+                        <p>为什么训练推理模型不用人类偏好打分，改用\"答案对不对\"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
                     </a>
                     <a href="world-model.html" class="article-card">
                         <div class="article-icon">🌍</div>
                         <h3>World Model</h3>
-                        <p>为什么生成一段逼真的视频，不代表模型真的理解物理规律？一篇讲清"世界模型"这个概念在讨论什么，以及为什么这个问题目前还没有定论。</p>
+                        <p>为什么生成一段逼真的视频，不代表模型真的理解物理规律？一篇讲清\"世界模型\"这个概念在讨论什么，以及为什么这个问题目前还没有定论。</p>
                     </a>
                     <a href="agent-memory.html" class="article-card">
                         <div class="article-icon">🧷</div>
                         <h3>Agent Memory</h3>
-                        <p>为什么带记忆功能的 Agent 有时候会"记错"、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。</p>
+                        <p>为什么带记忆功能的 Agent 有时候会\"记错\"、引用过时信息？一篇讲清 Agent Memory 到底该记什么、怎么检索、怎么遗忘。</p>
                     </a>
                     <a href="multimodal-agent.html" class="article-card">
                         <div class="article-icon">🖇️</div>
                         <h3>Multimodal Agent</h3>
-                        <p>为什么模型能"看图说话"，不代表它能成为可用的多模态 Agent？一篇讲清"能看见、能看懂、能行动"之间隔着的那几层工程鸿沟。</p>
+                        <p>为什么模型能\"看图说话\"，不代表它能成为可用的多模态 Agent？一篇讲清\"能看见、能看懂、能行动\"之间隔着的那几层工程鸿沟。</p>
                     </a>
                     <a href="a2a.html" class="article-card">
                         <div class="article-icon">🤝</div>
@@ -149,12 +150,17 @@
                     <a href="dsh.html" class="article-card">
                         <div class="article-icon">🧩</div>
                         <h3>DSH</h3>
-                        <p>DeepSeek Harness：2026-08 开源的 Agent 框架,连"决定下一步做什么"的主循环都能像插件一样被换掉——一切皆插件,是营销还是真架构？</p>
+                        <p>DeepSeek Harness：2026-08 开源的 Agent 框架,连\"决定下一步做什么\"的主循环都能像插件一样被换掉——一切皆插件,是营销还是真架构？</p>
                     </a>
                     <a href="dflash2.html" class="article-card">
                         <div class="article-icon">⚡</div>
                         <h3>DFlash2</h3>
                         <p>块扩散投机解码的下一代：候选路径选择 + 轻量卷积,在输出可证明不变的前提下,每次验证再多榨出 20%——选择比预测便宜。</p>
+                    </a>
+                    <a href="flash-wars.html" class="article-card">
+                        <div class="article-icon">⚔️</div>
+                        <h3>Flash Wars</h3>
+                        <p>一个月四响:GLM-5.3-Flash(线性+稀疏注意力,国产芯扛真实流量)、DeepSeek-V4-Flash-Vision-Exp(底座翻盘后装上眼睛)、Qwen3.8-Flash-Next(Qwen4 拆盲盒)——同名不同路的三种省钱哲学。</p>
                     </a>
                 </div>
             </section>
