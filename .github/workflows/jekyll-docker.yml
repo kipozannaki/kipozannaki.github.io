@@ -11,6 +11,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # 删除旧 artifact 需要 actions:write 权限
+  actions: write
 
 # 避免前后两次部署发生冲突
 concurrency:
@@ -29,6 +31,29 @@ jobs:
 
     - name: Setup Pages
       uses: actions/configure-pages@v5
+
+    - name: Remove stale github-pages artifacts
+      uses: actions/github-script@v7
+      with:
+        # 根因修复：deploy-pages 要求本次 run 只有 1 个名为 github-pages 的 artifact，
+        # 但每次部署成功都会留下一个 artifact，下次部署就会撞上 "Multiple artifacts" 报错。
+        # 上传前先清掉所有同名旧 artifact，打破这个循环。
+        script: |
+          const arts = await github.rest.actions.listArtifactsForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+          for (const a of arts.data.artifacts) {
+            if (a.name === 'github-pages' && !a.expired) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: a.id
+              });
+              console.log('deleted stale artifact ' + a.id);
+            }
+          }
 
     - name: Upload Artifact
       uses: actions/upload-pages-artifact@v3
