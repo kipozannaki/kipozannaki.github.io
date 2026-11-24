@@ -26,6 +26,7 @@
             <a href="application.html">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
             <a href="../frontier/frontier.html">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
         </nav>
     </header>
 
@@ -66,16 +67,16 @@
             <h3>2.2 Plan 的表示方式</h3>
             <p>一个完整的 Plan 应该包含：</p>
             <pre><code>Workflow: 代码审查自动化
-  ├── 步骤 1: 获取提交差异 (输入: commit SHA, 输出: diff)
-  │   └── 依赖: 无
-  ├── 步骤 2: 静态分析 (输入: diff, 输出: 分析报告)
-  │   └── 依赖: 步骤 1
-  ├── 步骤 3: 安全扫描 (输入: diff, 输出: 安全报告)
-  │   └── 依赖: 步骤 1  (与步骤 2 并行)
-  ├── 步骤 4: 汇总结果 (输入: 分析报告 + 安全报告, 输出: 审查报告)
-  │   └── 依赖: 步骤 2, 步骤 3
-  └── 步骤 5: 提交评论 (输入: 审查报告, 输出: PR 评论)
-      └── 依赖: 步骤 4</code></pre>
+├── 步骤 1: 获取提交差异 (输入: commit SHA, 输出: diff)
+│   └── 依赖: 无
+├── 步骤 2: 静态分析 (输入: diff, 输出: 分析报告)
+│   └── 依赖: 步骤 1
+├── 步骤 3: 安全扫描 (输入: diff, 输出: 安全报告)
+│   └── 依赖: 步骤 1  (与步骤 2 并行)
+├── 步骤 4: 汇总结果 (输入: 分析报告 + 安全报告, 输出: 审查报告)
+│   └── 依赖: 步骤 2, 步骤 3
+└── 步骤 5: 提交评论 (输入: 审查报告, 输出: PR 评论)
+    └── 依赖: 步骤 4</code></pre>
             <p>这个图里，步骤 2 和步骤 3 可以并行跑，因为它们都只依赖步骤 1。步骤 4 必须等两者都完成。这就是 Plan 的拓扑图。</p>
 
             <!-- ========== 三、Spec ========== -->
@@ -428,7 +429,7 @@ msg = {
                         <td>Temporal</td>
                         <td>企业级持久化、分布式执行、自动重试和补偿</td>
                         <td>长流程、关键业务、需要中断恢复</td>
-                        <td>学习曲线陡、基础设施重。如果 Workflow 很短（< 1 分钟），Temporal 的复杂度不值得</td>
+                        <td>学习曲线陡、基础设施重。如果 Workflow 很短（&lt; 1 分钟），Temporal 的复杂度不值得</td>
                     </tr>
                     <tr>
                         <td>LlamaIndex Workflows</td>

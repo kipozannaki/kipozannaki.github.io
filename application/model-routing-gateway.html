@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<!-- 文章页：Model Routing & Gateway — Application & Orchestration 专题第九篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Routing & Gateway · kipozannaki</title>
+    <meta name="description" content="为什么简单问题也要买旗舰模型？为什么模型 API 一限流业务就停？一篇讲清多模型路由、故障转移、缓存、预算和评测。">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="application.html" class="active">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🚦 Model Routing & Gateway</h1>
+            <p class="meta">为什么简单问题也要买旗舰模型？为什么模型 API 一限流，你的业务就跟着停？一篇讲清多模型时代的交通指挥系统 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么需要</a> · <a href="#how">网关做什么</a> · <a href="#routing">怎么路由</a> · <a href="#reliability">怎么兜底</a> · <a href="#cost">缓存与成本</a> · <a href="#evaluation">怎么评测</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <h2 id="intro">零、引言：模型越来越多，别让业务代码变成“API 交换机”</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么用户只想让你把一句话润色一下，你却把整段上下文发给最贵的旗舰模型？</li>
+                <li>为什么应用里同时接了五六家模型，每家都要写一套鉴权、错误解析和重试代码？</li>
+                <li>为什么上游只是短暂返回一个 429，你的产品就跟着白屏，而不是自动切到备用模型？</li>
+                <li>为什么模型账单越用越离谱，直到月底才发现某个 Agent 在后台疯狂重试？</li>
+                <li>为什么“换了更强的模型”之后效果反而变差，却连请求当时究竟走了哪个模型都查不到？</li>
+            </ul>
+            <p>这些问题的共同答案是：<strong>模型调用已经从“选一个 SDK 调 API”，变成了“管理一组持续变化的外部服务”</strong>。Model Routing 解决“这次请求该交给谁”，Gateway 解决“所有模型请求怎样统一进出、统一管控”。</p>
+            <blockquote>💡 <strong>没有网关时，业务代码负责模型能力；有了网关，业务代码才能只负责业务。路由不是炫技，而是把成本、质量和可用性从“随缘”变成“策略”。</strong></blockquote>
+
+            <h2 id="zuobiao">一、Model Routing & Gateway 在 AI 世界里的坐标</h2>
+            <p>把它放在一次真实请求的链路里看，位置就非常清楚：</p>
+            <pre><code>用户 / Agent / Workflow
+        ↓
+业务服务（权限、任务编排、业务校验）
+        ↓
+AI Gateway  ← 本篇
+  ├─ 鉴权、限流、预算、审计
+  ├─ 路由选择、负载均衡
+  ├─ 超时、重试、熔断、Fallback
+  └─ 精确缓存 / 语义缓存
+        ↓
+模型供应商 A / B / 本地推理服务
+        ↓
+Inference（Prefill → Decode）</code></pre>
+            <p>它和几个熟悉概念的关系，可以用一句话切开：</p>
+            <table>
+                <thead>
+                    <tr><th>概念</th><th>管什么</th><th>和网关的关系</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Prompt Engineering</td><td>怎么问模型</td><td>决定请求内容，不决定请求去哪</td></tr>
+                    <tr><td>Context Engineering</td><td>给模型看多少、看什么</td><td>控制输入长度，网关再判断是否超限、该切到哪个长上下文模型</td></tr>
+                    <tr><td>Workflow / Agent</td><td>一次任务分几步、谁先谁后</td><td>每一步都可以调用网关，由网关处理模型侧故障</td></tr>
+                    <tr><td>Inference</td><td>一个模型怎样算出答案</td><td>网关不改变单次推理算法，但会改变部署、并发和成本结构</td></tr>
+                    <tr><td><a href="../foundation/knowledge-distillation.html">Knowledge Distillation</a></td><td>怎样把大模型能力迁进小模型</td><td>蒸馏改变“模型池里有哪些便宜可用的模型”，路由负责把它们用起来</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>Prompt 决定问什么，Routing 决定问谁，Gateway 决定问完之后怎样安全、省钱、不断线地收回来。</strong></blockquote>
+
+            <h2 id="why">二、为什么不能所有请求都走同一个模型？</h2>
+            <p>因为真实业务里的请求，从来不是同一种请求。</p>
+            <table>
+                <thead>
+                    <tr><th>请求类型</th><th>典型例子</th><th>主要矛盾</th><th>常见选择</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>高频轻任务</td><td>分类、抽取、改写、打标签</td><td>成本与吞吐</td><td>小模型、便宜模型、本地模型</td></tr>
+                    <tr><td>复杂推理</td><td>多步分析、代码调试、方案权衡</td><td>成功率与推理深度</td><td>强模型、长思考模型</td></tr>
+                    <tr><td>超长输入</td><td>整本合同、长会话、大仓库上下文</td><td>上下文窗口与延迟</td><td>长上下文模型，必要时先压缩</td></tr>
+                    <tr><td>严格时效</td><td>实时客服、搜索摘要</td><td>首字延迟与稳定性</td><td>低延迟部署、就近区域、限时回退</td></tr>
+                    <tr><td>高风险操作</td><td>生产变更、财务建议</td><td>质量与合规</td><td>指定模型、禁止自动降级、人工确认</td></tr>
+                </tbody>
+            </table>
+            <p>全部走旗舰模型，是用钱换质量，但大部分钱花在了不需要的地方；全部走便宜模型，是省钱，但会在真正困难的请求上翻车。<strong>路由的价值，就是让不同请求为不同的质量目标买单。</strong></p>
+            <p>还要注意：<strong>Model Routing 不等于 Load Balancing</strong>。负载均衡通常是在能力相近的多个部署之间分摊流量；模型路由是在能力、价格、上下文长度、合规区域不同的模型之间做选择。把两者混在一起，很容易出现“为了高可用，把关键任务随机分给了弱模型”的事故。</p>
+
+            <h2 id="how">三、Gateway 到底做什么？别把它只理解成“套壳代理”</h2>
+            <p>一个靠谱的 AI Gateway，至少要把下面七件事收口：</p>
+            <ol>
+                <li><strong>统一接口</strong>：对业务暴露稳定协议，隐藏供应商差异；升级供应商时，不让业务代码跟着改。</li>
+                <li><strong>统一身份与权限</strong>：业务拿虚拟 Key，真实供应商密钥留在网关；按团队、项目、用户控制可访问的模型。</li>
+                <li><strong>路由与容量管理</strong>：按规则、成本、延迟、剩余配额选择模型和部署。</li>
+                <li><strong>可靠性控制</strong>：超时、有限重试、熔断、冷却、Fallback，避免单个供应商拖垮全局。</li>
+                <li><strong>成本治理</strong>：记录 Token 用量、设置预算、限制输出长度、阻止失控循环。</li>
+                <li><strong>缓存与优化</strong>：复用相同请求或相似请求，减少重复推理。</li>
+                <li><strong>可观测性</strong>：记录请求最终由谁处理、失败了几次、花了多少钱、质量是否达标。</li>
+            </ol>
+            <p>如果你只做了第 1 项，那叫“API 适配器”；做到第 2—7 项，才配叫“生产网关”。LiteLLM、Portkey、云厂商 AI Gateway 或自研网关都可以是载体，<strong>真正重要的是策略，而不是框架名字</strong>。</p>
+            <blockquote>💡 <strong>网关不是让模型变聪明，而是让一群不完美的模型，组合成一个可预测、可控制、可追责的系统。</strong></blockquote>
+
+            <h2 id="routing">四、怎么路由？从三条规则开始，别一上来就训练路由器</h2>
+            <h3>4.1 静态规则：最便宜、最可解释的起点</h3>
+            <p>先从业务里能明确写出来的条件开始：</p>
+            <pre><code>if 请求包含敏感数据:
+    只允许走私有部署
+elif 输入 Token 超过主模型预算:
+    走长上下文模型
+elif 任务类型 in {"分类", "抽取", "改写"}:
+    走小模型
+elif 风险等级 == "高":
+    走指定强模型，禁止自动降级
+else:
+    走默认模型</code></pre>
+            <p>规则路由的优点是上线快、可审计、容易回滚。缺点是维护成本会随规则数量增长，而且不同条件可能互相冲突。因此要为每条规则标注<strong>负责人、命中量、质量下限和灰度比例</strong>，不能让它成为没人敢删的“祖传代码”。</p>
+
+            <h3>4.2 动态策略：在能力相近的部署之间做工程选择</h3>
+            <table>
+                <thead>
+                    <tr><th>策略</th><th>解决的问题</th><th>需要小心</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>权重分流</td><td>灰度发布、逐步放量</td><td>权重不等于实际流量，仍要看容量</td></tr>
+                    <tr><td>最少在途请求</td><td>避免流量压到正忙的实例</td><td>请求耗时不同时，并发数不等于真实负载</td></tr>
+                    <tr><td>延迟感知</td><td>优先选择响应快的部署</td><td>历史延迟可能过时，要设置观察窗口和冷却</td></tr>
+                    <tr><td>配额感知</td><td>绕开已耗尽的 RPM / TPM 配额</td><td>多实例部署需要共享计数状态</td></tr>
+                    <tr><td>成本感知</td><td>在质量达标集合里选更便宜的</td><td>先有质量门槛，再谈最低价</td></tr>
+                </tbody>
+            </table>
+            <p>LiteLLM 官方提供 <code>simple-shuffle</code>、<code>least-busy</code>、<code>latency-based-routing</code>、<code>usage-based-routing-v2</code>、<code>cost-based-routing</code> 等策略，并明确建议高流量生产环境从低开销的 <code>simple-shuffle</code> 开始，再按真实瓶颈调整。不要因为某个策略名字听起来更“智能”，就忽略它引入的延迟和状态依赖。</p>
+
+            <h3>4.3 学习型路由：有评测之后再上</h3>
+            <p>学习型路由器会根据请求特征预测“哪个模型更可能成功”，但它自己也会错，而且可能把错误集中到某个用户群。更稳妥的路径是：</p>
+            <ol>
+                <li>先保留一个强模型基线，记录真实请求和结果；</li>
+                <li>给候选模型建立离线评测集与业务验收线；</li>
+                <li>用规则做第一版路由，收集“哪个模型在哪类请求上更好”的数据；</li>
+                <li>小流量灰度，对比单模型基线的质量、成本和 P95 延迟；</li>
+                <li>发现分群退化时，能一键退回默认模型。</li>
+            </ol>
+            <blockquote>💡 <strong>路由器本身也是一个需要评测的模型或策略。它最大的风险不是“选得不够聪明”，而是“你以为它在优化成本，其实它在静默牺牲质量”。</strong></blockquote>
+
+            <h2 id="reliability">五、怎么兜底？重试、熔断、Fallback 是三件不同的事</h2>
+            <table>
+                <thead>
+                    <tr><th>机制</th><th>什么时候用</th><th>不能做什么</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Timeout</td><td>单次调用不能在规定时间内完成</td><td>超时不代表上游永久不可用</td></tr>
+                    <tr><td>Retry</td><td>网络抖动、短暂 429、可恢复的 5xx</td><td>不能无限重试，也不能原样重试参数错误</td></tr>
+                    <tr><td>Circuit Breaker</td><td>一个部署连续失败，暂时停止送流量</td><td>不能把所有模型一起熔断</td></tr>
+                    <tr><td>Cooldown</td><td>失败后给上游恢复时间</td><td>冷却结束不代表质量已经恢复</td></tr>
+                    <tr><td>Fallback</td><td>主模型失败后切换备用模型或部署</td><td>不能默认备用模型一定满足原质量要求</td></tr>
+                </tbody>
+            </table>
+            <p>一个容易忽略的细节是：<strong>对用户来说“返回 200”不等于成功</strong>。主模型可能返回了完整 JSON，但字段缺失、工具调用格式错误、答案明显跑题。网关能处理网络故障，业务校验和模型质量评测仍要留在应用层或独立评测层。</p>
+
+            <h3>5.1 错误要分类，不能一把梭</h3>
+            <table>
+                <thead>
+                    <tr><th>错误</th><th>建议动作</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>400 / 参数不合法</td><td>直接拒绝，修正调用方，不重试</td></tr>
+                    <tr><td>401 / 403</td><td>告警并停止无效重试，检查密钥与权限</td></tr>
+                    <tr><td>上下文超限</td><td>压缩上下文，或切到明确支持该长度的模型</td></tr>
+                    <tr><td>429</td><td>遵守退避策略，切到有配额的部署；避免重试风暴</td></tr>
+                    <tr><td>5xx / 连接错误</td><td>有限重试，随后 Fallback</td></tr>
+                    <tr><td>内容策略拒绝</td><td>按合规策略处理，不能为了成功随便换供应商绕过</td></tr>
+                    <tr><td>流式输出中途断开</td><td>首 Token 前可切换；已展示部分内容时由产品决定如何恢复</td></tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 一个最小可用的配置骨架</h3>
+            <p>下面以 LiteLLM Proxy 为例，模型名和供应商仅作示意，部署时替换成自己账号中真实可用的模型：</p>
+            <pre><code>model_list:
+  - model_name: chat-main
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/PRIMARY_API_KEY
+  - model_name: chat-fallback
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/BACKUP_API_KEY
+  - model_name: chat-long
+    litellm_params:
+      model: openai/gpt-4.1
+      api_key: os.environ/LONG_CONTEXT_API_KEY
+
+router_settings:
+  enable_pre_call_checks: true
+  num_retries: 2
+  fallbacks:
+    - chat-main: [chat-fallback]
+  context_window_fallbacks:
+    - chat-main: [chat-long]
+  allowed_fails: 3
+  cooldown_time: 30</code></pre>
+            <p>这个配置的重点不是“抄”，而是四个边界：<strong>重试次数有限、普通错误与上下文错误分流、连续失败会冷却、备用模型要显式声明</strong>。不同版本的配置位置和默认值可能变化，以上线版本的官方文档为准。</p>
+            <p>还要算一笔总账：如果单次超时是 10 秒、允许重试 2 次、再切换一个备用模型，那么用户可能等待接近 40 秒。<strong>每个 attempt 的超时之和，必须小于产品能接受的总截止时间。</strong>网关自己做了 Fallback，不代表用户一定等得起。</p>
+            <blockquote>💡 <strong>可靠性不是“多试几次”，而是“在总 deadline 内，用有限次数把请求送到一个能满足要求的地方”。</strong></blockquote>
+
+            <h2 id="cost">六、缓存与成本：先别让同样的钱，反复花在同一个问题上</h2>
+            <h3>6.1 精确缓存和语义缓存，不是一回事</h3>
+            <table>
+                <thead>
+                    <tr><th>类型</th><th>怎么判断命中</th><th>适合</th><th>主要风险</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>精确缓存</td><td>规范化请求的哈希完全一致</td><td>固定模板、重复问答、Embedding</td><td>Key 设计漏字段，导致串答案</td></tr>
+                    <tr><td>语义缓存</td><td>Embedding 相似度超过阈值</td><td>说法不同但意图相同的独立问题</td><td>把“差不多”误判成“完全一样”</td></tr>
+                    <tr><td>Prompt Caching</td><td>复用供应商侧的 KV / 前缀计算</td><td>长系统提示、固定文档前缀</td><td>命中规则和有效期依供应商而异</td></tr>
+                </tbody>
+            </table>
+            <p>精确缓存的 Key 至少要覆盖：<strong>模型及版本、System Prompt、完整上下文、工具定义、关键采样参数、租户与权限范围</strong>。漏掉任何一项，都可能把 A 用户的答案返回给 B 用户。</p>
+            <p>语义缓存更像“意思接近就复用”，在单轮 FAQ 可能省钱，但在 Agent 场景非常危险：“把退款提高到 100 元”和“把退款提高到 10 元”可能向量很近，业务语义却完全不同。<strong>涉及金额、身份、订单、时间的请求，应默认关闭语义缓存。</strong></p>
+            <p>LiteLLM 官方也明确提醒：精确缓存基于整个请求的哈希；语义缓存适合单轮提示，用于 Agent 流量容易出错。缓存不是全局开关一开了事，而要做租户隔离、TTL、失效和命中审计。</p>
+
+            <h3>6.2 Token 预算和成本上限，要按“成功任务”计算</h3>
+            <p>单 Token 价格只是成本的一部分。真实成本应该这样看：</p>
+            <pre><code>单位成功任务成本 =
+  (输入 Token × 输入单价 + 输出 Token × 输出单价
+   + 工具调用成本 + 缓存存储成本)
+  × 平均尝试次数
+  ÷ 任务成功率</code></pre>
+            <p>一个便宜模型如果只有 60% 成功率，重试三次后，可能比一次就成功的强模型更贵。一个更贵的路由器如果能把简单请求准确分流，也可能在整体账单上回本。</p>
+            <p>工程上至少设置四道闸门：</p>
+            <ul>
+                <li><strong>输入上限</strong>：超长请求先压缩或拒绝，不无限塞上下文；</li>
+                <li><strong>输出上限</strong>：限制 <code>max_tokens</code>，防止模型写个不停；</li>
+                <li><strong>尝试上限</strong>：限制重试、Fallback 和 Agent 循环次数；</li>
+                <li><strong>预算上限</strong>：按团队、项目、虚拟 Key 设置日预算与告警。</li>
+            </ul>
+            <blockquote>💡 <strong>成本优化不是把所有请求都变便宜，而是在满足质量下限的前提下，降低每个成功任务的总支出。</strong></blockquote>
+
+            <h2 id="evaluation">七、怎么证明路由真的有用？网关自己也要被评测</h2>
+            <p>只看“平均响应时间”和“总账单”远远不够。建议把指标分成四层：</p>
+            <table>
+                <thead>
+                    <tr><th>层级</th><th>核心指标</th><th>回答的问题</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>路由决策</td><td>各模型流量占比、规则命中率、分类混淆矩阵</td><td>请求有没有被分到预期模型？</td></tr>
+                    <tr><td>模型质量</td><td>任务成功率、格式合法率、人工抽检分、分群表现</td><td>换模型之后，质量有没有退化？</td></tr>
+                    <tr><td>系统可靠性</td><td>P50 / P95 / P99 延迟、TTFT、超时率、Fallback 率、熔断次数</td><td>系统是否更稳？</td></tr>
+                    <tr><td>成本效率</td><td>每千次请求成本、每成功任务成本、缓存命中率</td><td>省钱是否以质量为代价？</td></tr>
+                </tbody>
+            </table>
+            <p>落地时最有效的动作是<strong>影子流量</strong>：主模型照常返回给用户，同时把相同请求静默发给候选模型，离线比较质量。这样不用拿真实用户做小白鼠，也能积累路由训练和验收数据。</p>
+            <p>每次上线至少跑这三组对照：</p>
+            <ol>
+                <li><strong>原策略 vs 新策略</strong>：同一批请求，比较质量、延迟、成本；</li>
+                <li><strong>强模型全量 vs 路由策略</strong>：确认省下的钱是否值得；</li>
+                <li><strong>主模型正常 vs 主模型故障</strong>：确认 Fallback 真能工作，而不是只在配置里好看。</li>
+            </ol>
+            <p>日志里必须保留 <code>request_id</code>、原始模型组、最终模型、部署 ID、尝试次数、缓存命中、Token 用量和失败原因。<strong>如果一次请求经历了三次切换，你却不能还原它去过哪里，那么这套网关还没有可运维性。</strong></p>
+
+            <h2 id="wuqu">八、常见误区</h2>
+            <h3>误区一：模型越多，路由越智能</h3>
+            <p><strong>真相</strong>：候选模型越多，评测、兼容、成本和故障组合越复杂。没有质量数据的“智能路由”，只是更花式地猜。</p>
+
+            <h3>误区二：Fallback 就是自动降级到便宜模型</h3>
+            <p><strong>真相</strong>：Fallback 首先要满足能力、上下文、工具调用、数据区域等约束。关键任务可以允许“失败”，但不能允许悄悄换成一个不合格的模型。</p>
+
+            <h3>误区三：所有 429 都值得立刻重试</h3>
+            <p><strong>真相</strong>：429 可能来自账号配额、组织预算、模型容量或请求速率限制。盲目重试会把局部限流放大成重试风暴。</p>
+
+            <h3>误区四：语义缓存等于更聪明的精确缓存</h3>
+            <p><strong>真相</strong>：语义相似不代表业务等价。对个性化、金额、状态变更和工具调用请求，错误命中的代价远高于省下的 Token。</p>
+
+            <h3>误区五：网关只是基础设施，不需要业务评测</h3>
+            <p><strong>真相</strong>：路由会改变用户实际收到的模型和质量。它不是中性的“管道”，而是系统行为的一部分。</p>
+            <blockquote>💡 <strong>路由的上限，不是你能接多少家模型，而是你能多准确地知道“哪家模型在哪类任务上值得信”。</strong></blockquote>
+
+            <h2 id="jieyu">九、总结：别让模型选择，散落在每一个 if-else 里</h2>
+            <p><strong>给小白的话</strong>：你可以把网关想象成一家餐厅的总台。你说“想吃快一点”或“要正式宴请”，总台据此安排厨房；某家厨房临时停电，总台会按规则换一家，而不是让你自己挨家敲门。模型路由，就是 AI 应用的这位总台。</p>
+            <p><strong>给开发者的话</strong>：先做稳定别名、统一鉴权、有限重试和显式 Fallback，再做规则路由、精确缓存和完整日志；最后才考虑复杂的学习型路由。每增加一个“聪明策略”，都要同时增加一份可回滚方案和一组评测指标。</p>
+            <blockquote>💡 <strong>模型是发动机，网关是交通系统。单台发动机再强，也扛不住所有车辆都往同一条路上冲。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：<a href="https://docs.litellm.ai/docs/routing" target="_blank" rel="noopener">LiteLLM Routing Strategies</a>；<a href="https://docs.litellm.ai/docs/proxy/reliability" target="_blank" rel="noopener">LiteLLM Fallbacks & Reliability</a>；<a href="https://docs.litellm.ai/docs/proxy/caching" target="_blank" rel="noopener">LiteLLM Caching</a>。配置与功能随版本变化，请以对应版本官方文档为准。</p>
+
+            <nav class="article-nav">
+                <a href="loop-engineering.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🔄 Loop Engineering</span>
+                    </span>
+                </a>
+            </nav>
+
+            <a href="application.html" class="back-link">← 返回 Application 专题</a>
+        </div>
+    </article>
+
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>

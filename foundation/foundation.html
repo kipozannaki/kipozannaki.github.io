@@ -26,7 +26,6 @@
             <a href="../application/application.html">Application</a>
             <a href="foundation.html" class="active">Foundation</a>
             <a href="../frontier/frontier.html">Frontier</a>
-            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -36,7 +35,7 @@
 
     <section class="hero-compact">
         <h1>Foundation & Core Algorithms</h1>
-        <p>AI 底层基础与核心算法 · 9 篇笔记（2026-07-03 更新）</p>
+        <p>AI 底层基础与核心算法 · 10 篇笔记（2026-11-24 更新）</p>
     </section>
 
     <div class="site-layout">
@@ -60,6 +59,7 @@
                 <a href="moe.html" class="sidebar-item" title="MoE"><span class="icon">🧩</span><span class="text">MoE</span></a>
                 <a href="long-context.html" class="sidebar-item" title="Long Context"><span class="icon">📏</span><span class="text">Long Context</span></a>
                 <a href="multimodal.html" class="sidebar-item" title="Multimodal"><span class="icon">🖼️</span><span class="text">Multimodal</span></a>
+                <a href="knowledge-distillation.html" class="sidebar-item" title="Knowledge Distillation"><span class="icon">🎓</span><span class="text">Knowledge Distillation</span></a>
             </div>
         </aside>
 
@@ -71,6 +71,7 @@
                     <li><strong>模型结构</strong>　Transformer / Attention 的设计与变体、Mamba 等新架构的取舍</li>
                     <li><strong>训练范式</strong>　预训练 / SFT / RLHF / DPO 的链路与权衡</li>
                     <li><strong>推理优化</strong>　KV Cache、量化、Speculative Decoding 的工程实践</li>
+                    <li><strong>模型压缩</strong>　Knowledge Distillation：用教师模型的知识训练更小、更适合部署的学生模型</li>
                     <li><strong>评测方法</strong>　怎么测一个模型"真的"变好，而不是只在几个 Benchmark 上刷分</li>
                 </ul>
                 <p>和 Application 专题不同——这一专题关心的是"为什么模型会这样回答"，而不是"怎么让模型按我的要求回答"。</p>
@@ -123,6 +124,11 @@
                         <div class="article-icon">🖼️</div>
                         <h3>Multimodal</h3>
                         <p>为什么高清图塞进去原本灵光的指令直接废了？为什么多图长文本让显存瞬间融化？一篇讲清多模态底层的特征缝合与 Token 爆炸。</p>
+                    </a>
+                    <a href="knowledge-distillation.html" class="article-card">
+                        <div class="article-icon">🎓</div>
+                        <h3>Knowledge Distillation</h3>
+                        <p>为什么强教师给出的标准答案，不一定能教出好学生？一篇讲清 SFT、Response Distillation、On-Policy Distillation 与合成数据。</p>
                     </a>
                 </div>
             </section>

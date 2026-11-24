@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reasoning Model · kipozannaki</title>
-    <meta name="description" content="为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。">
+    <meta name="description" content="为什么 o1 / r1 这类模型要先&quot;想&quot;很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。">
     <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
     <script>
     (function() {
@@ -25,6 +25,7 @@
             <a href="../application/application.html">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
             <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -35,7 +36,7 @@
     <article class="article-page">
         <header class="article-header">
             <h1>🧠 Reasoning Model</h1>
-            <p class="meta">为什么 o1 / r1 这类模型要先"想"很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
+            <p class="meta">为什么 o1 / r1 这类模型要先&quot;想&quot;很久才回答？为什么想得越久不一定越对？一篇讲清推理模型到底是怎么被训练出来的。</p>
         </header>
         <div class="article-body">
 
@@ -57,9 +58,9 @@
             <pre><code>Foundation：Alignment（RLHF / DPO，奖励来自人类偏好排序）
 Foundation：Inference（Prefill + Decode，一次前向生成一个答案）
     ↓
-Reasoning Model：用"答案是否正确"当奖励信号，训练模型生成更长的中间推理链条  ← 本篇
+Reasoning Model：用&quot;答案是否正确&quot;当奖励信号，训练模型生成更长的中间推理链条  ← 本篇
     ↓
-Frontier：Test-Time Compute / Inference Scaling（下一篇：把"多算一会儿"变成可量化的能力提升）</code></pre>
+Frontier：Test-Time Compute / Inference Scaling（下一篇：把&quot;多算一会儿&quot;变成可量化的能力提升）</code></pre>
             <table>
                 <thead> <tr><th>相关概念</th><th>跟 Reasoning Model 的关系</th></tr> </thead>
                 <tbody>

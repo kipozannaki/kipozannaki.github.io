@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RLVR · kipozannaki</title>
-    <meta name="description" content="为什么训练推理模型不用人类偏好打分，改用"答案对不对"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。">
+    <meta name="description" content="为什么训练推理模型不用人类偏好打分，改用&quot;答案对不对&quot;当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。">
     <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
     <script>
     (function() {
@@ -25,6 +25,7 @@
             <a href="../application/application.html">Application</a>
             <a href="../foundation/foundation.html">Foundation</a>
             <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
         </nav>
         <div class="header-tools">
             <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
@@ -35,7 +36,7 @@
     <article class="article-page">
         <header class="article-header">
             <h1>🎯 RLVR</h1>
-            <p class="meta">为什么训练推理模型不用人类偏好打分，改用"答案对不对"当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
+            <p class="meta">为什么训练推理模型不用人类偏好打分，改用&quot;答案对不对&quot;当奖励？一篇讲清 RLVR 这套可验证奖励的强化学习到底解决了什么问题，又在哪里会被钻空子。</p>
         </header>
         <div class="article-body">
 
@@ -53,7 +54,7 @@
             <h2 id="zuobiao">RLVR 在这套体系里的坐标</h2>
             <pre><code>Foundation：Alignment（RLHF：奖励来自人类偏好排序，主观、覆盖面广，但成本高、容易被讨好）
     ↓
-Frontier：Reasoning Model（提到"用答案对不对当奖励"这个思路）
+Frontier：Reasoning Model（提到&quot;用答案对不对当奖励&quot;这个思路）
     ↓
 Frontier：RLVR（本篇：这套训练机制具体是怎么运作的，边界在哪）  ← 本篇
     ↓

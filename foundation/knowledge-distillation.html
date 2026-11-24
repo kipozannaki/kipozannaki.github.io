@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<!-- 文章页：Knowledge Distillation — Foundation & Core Algorithms 专题第十篇 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Distillation · kipozannaki</title>
+    <meta name="description" content="为什么大模型能教会小模型，小模型却不一定要照抄答案？一篇讲清 SFT、Response Distillation、On-Policy Distillation 与合成数据。">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* storage 不可用时静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="foundation.html" class="active">Foundation</a>
+            <a href="../frontier/frontier.html">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🎓 Knowledge Distillation</h1>
+            <p class="meta">为什么大模型能教会小模型，小模型却不一定要照抄答案？一篇讲清 SFT、Response Distillation、On-Policy Distillation 与合成数据 · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#why">为什么有效</a> · <a href="#how">怎么工作</a> · <a href="#opd">离线与在线</a> · <a href="#research">前沿论文</a> · <a href="#data">合成数据</a> · <a href="#engineering">工程实践</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <h2 id="intro">零、引言：老师很强，不代表把答案复印给学生就会有效</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么把旗舰模型的回答全部拿去微调小模型，小模型 benchmark 涨了，一上线却经常在奇怪的地方翻车？</li>
+                <li>为什么有些“DeepSeek-Distill”类模型看起来比普通同尺寸模型更会推理，它们的训练方式到底特殊在哪？</li>
+                <li>为什么让学生自己先答、老师再针对学生的答案指导，可能比直接看老师示范更有效？</li>
+                <li>为什么在线策略蒸馏效果好，但训练账单也可能吓人？是不是所有场景都必须实时生成？</li>
+                <li>为什么“合成数据”越做越多，模型却没有变强，反而开始复读、偏科、过度自信？</li>
+            </ul>
+            <p>这些问题都指向 <strong>Knowledge Distillation（知识蒸馏）</strong>：让一个能力更强的 Teacher，把知识、推理方式或行为分布迁移给一个更小的 Student。这里的“蒸馏”不是把大模型文件压小，而是<strong>用训练信号重新教一个模型</strong>。</p>
+            <blockquote>💡 <strong>蒸馏不是“把老师的答案复制给学生”，而是“在学生能理解、会遇到的场景里，把老师更细腻的判断变成学生学得动的信号”。</strong></blockquote>
+
+            <h2 id="zuobiao">一、Knowledge Distillation 在 AI 世界里的坐标</h2>
+            <p>把它放回模型从训练到部署的链路里：</p>
+            <pre><code>Pretraining：获得语言能力与世界知识
+      ↓
+Alignment：SFT / RLHF / DPO，形成能听指令的模型
+      ↓
+Teacher：更强、更贵或更专的模型
+      ↓
+Knowledge Distillation  ← 本篇
+      ├─ Logits / Feature Distillation（能拿到中间信号时）
+      ├─ Response Distillation（模仿教师输出）
+      └─ On-Policy Distillation（在学生自己的轨迹上接受指导）
+      ↓
+Student：更小、更便宜、可本地部署的模型
+      ↓
+Quantization / Inference 优化 → 上线</code></pre>
+            <p>它经常和另外几种“让小模型可用”的手段一起出现，但解决的是不同问题：</p>
+            <table>
+                <thead>
+                    <tr><th>手段</th><th>改变什么</th><th>主要目的</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Knowledge Distillation</td><td>通过训练改变学生参数</td><td>迁移能力、行为或推理模式</td></tr>
+                    <tr><td>SFT</td><td>通过标注样本改变模型参数</td><td>学会任务格式、领域知识、指令遵循；不一定是蒸馏</td></tr>
+                    <tr><td>Quantization</td><td>降低权重数值精度</td><td>省显存、提速；通常不负责能力迁移</td></tr>
+                    <tr><td>Pruning</td><td>删除部分结构或参数</td><td>压缩模型；需要评估能力损失</td></tr>
+                    <tr><td>RAG</td><td>推理时接入外部知识</td><td>补最新事实，不把知识稳定写进参数</td></tr>
+                    <tr><td>Prompt / Tool Use</td><td>改变模型看到的信息与可用手段</td><td>不改参数，提升单次任务表现</td></tr>
+                </tbody>
+            </table>
+            <p>一个常见组合是：<strong>先用蒸馏得到更会推理的学生，再量化部署；上线后用 RAG 补私有知识，用 Workflow 和 Harness 管住工具与流程。</strong>四者不是替代关系，而是各修一段路。</p>
+            <blockquote>💡 <strong>蒸馏改变“模型会什么”，量化改变“模型怎么装”，RAG 改变“模型现在知道什么”，Agent 改变“模型现在能做什么”。</strong></blockquote>
+
+            <h2 id="why">二、为什么蒸馏有效？老师给的不只是“标准答案”</h2>
+            <p>传统监督学习常用 One-hot 标签：正确答案是 1，其余是 0。但语言模型面对的问题，往往不是非黑即白。比如一道数学题，某个错误写法虽然答案不对，却可能体现了正确的解题方向；某两个同义表达都合理，只是风格不同。</p>
+            <p>Soft Label 能保留更多信息：老师不是在终点插一面旗，而是在每条岔路口告诉你“这条路更像正确答案”。学生学到的因此不只是最终结果，还包括<strong>词元之间的相对偏好、推理路径的倾向和不确定边界</strong>。</p>
+            <table>
+                <thead>
+                    <tr><th>监督信号</th><th>学生看到什么</th><th>信息量</th><th>局限</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Hard Label</td><td>对 / 错、一个固定答案</td><td>低</td><td>无法表达“哪个错误更接近正确”</td></tr>
+                    <tr><td>Teacher Soft Label</td><td>完整概率分布或 logits</td><td>高</td><td>需要兼容词表和可访问的中间输出</td></tr>
+                    <tr><td>Teacher Response</td><td>老师的完整回答、解释或代码</td><td>中高</td><td>通常退化为 SFT，学不到完整分布</td></tr>
+                    <tr><td>Per-token Feedback</td><td>学生轨迹上每个位置的教师概率或奖励</td><td>高</td><td>需要教师在线或批量评分，成本较高</td></tr>
+                </tbody>
+            </table>
+            <p>经典 KD 常用温度参数 <code>T</code> 软化概率分布，再让学生分布逼近教师分布。可以直观写成：</p>
+            <pre><code>L_KD = α × KL( p_teacher(y | x) / T  ||  p_student(y | x) / T )
+
+总损失 = L_KD + (1 - α) × L_task</code></pre>
+            <p>这里不必被公式吓住。核心只有一句：<strong>老师把“答案空间里的相对可能性”教给学生，学生再同时学习真实任务目标。</strong></p>
+            <blockquote>💡 <strong>标准答案告诉学生“终点在哪”，Soft Label 告诉学生“哪条路更接近终点”。后者更细腻，但也更容易把老师的偏见一起教过去。</strong></blockquote>
+
+            <h2 id="how">三、Knowledge Distillation 到底怎么工作？</h2>
+            <h3>3.1 选对老师和学生，比选损失函数更重要</h3>
+            <p>老师不是越大越好。理想的老师应该在目标任务上明显强于学生，同时输出稳定、错误率可控。一个在通用榜上很强、却不懂你的业务格式的模型，可能不是好老师。</p>
+            <ul>
+                <li><strong>能力差距</strong>：差距太小，教不了太多；差距太大，学生可能学不会复杂推理。</li>
+                <li><strong>词表兼容性</strong>：做 logits 蒸馏通常需要相同或可对齐的 Token 空间；跨词表时往往改用 response / sequence-level 方法。</li>
+                <li><strong>领域匹配</strong>：医学、法律、代码等专业任务，专用老师常比通用旗舰更可靠。</li>
+                <li><strong>可复现性</strong>：闭源 API 会更新模型，训练数据版本必须记录快照与日期。</li>
+                <li><strong>安全与合规</strong>：老师输出会进入训练数据，隐私、版权和内容政策都必须过检。</li>
+            </ul>
+
+            <h3>3.2 Response Distillation：最常用的“老师示范，学生模仿”</h3>
+            <p>当拿不到教师 logits 时，最常见的做法是让老师生成回答，再对学生做 SFT：</p>
+            <pre><code>{
+  "messages": [
+    {"role": "user", "content": "分析这段日志中的根因，并给出修复步骤"},
+    {"role": "assistant", "content": "老师生成的回答"}
+  ]
+}</code></pre>
+            <p>它工程门槛低，适合格式迁移、领域风格、标准流程和部分知识迁移。但问题也很明显：<strong>学生只见过老师走对的路线，没练过自己走错之后怎样纠正。</strong>一旦推理时偏离训练轨迹，错误就可能沿着自回归生成不断放大，这就是典型的 exposure bias。</p>
+
+            <h3>3.3 为什么有时候“先让学生答”效果更好？</h3>
+            <p>On-Policy Distillation 把顺序反过来：</p>
+            <pre><code>学生先按当前能力生成回答
+        ↓
+教师针对“学生实际生成的轨迹”提供监督
+        ↓
+学生更新参数
+        ↓
+下一轮继续从更新后的学生分布采样</code></pre>
+            <p>好处是训练时学生练到的，正是它推理时容易说出的那种表达、错误和上下文。老师不必只给一份完美示范，而是可以在学生的错误路径上逐 Token 纠偏。</p>
+            <p>代价同样真实：每轮都要重新采样，长回答、多轮 Agent、工具环境都会放大推理成本；如果学生偏得太远，老师也可能在陌生轨迹上给出不可靠指导。<strong>“更贴近学生”与“更接近老师”之间存在张力，这正是 2026 年 OPD 研究的核心问题之一。</strong></p>
+
+            <h2 id="opd">四、离线蒸馏和在线策略蒸馏，到底怎么选？</h2>
+            <table>
+                <thead>
+                    <tr><th>维度</th><th>离线 Response Distillation</th><th>固定学生轨迹蒸馏</th><th>Online OPD</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>训练样本</td><td>教师生成的答案</td><td>初始学生生成的轨迹，之后复用</td><td>不断从当前学生重新采样</td></tr>
+                    <tr><td>教师介入</td><td>生成阶段</td><td>离线评分阶段</td><td>训练循环中</td></tr>
+                    <tr><td>贴近学生</td><td>较弱</td><td>中等</td><td>最强</td></tr>
+                    <tr><td>训练成本</td><td>较低</td><td>中低</td><td>较高</td></tr>
+                    <tr><td>主要优势</td><td>简单、易扩展、格式稳定</td><td>成本与相关性的折中</td><td>密集反馈、覆盖学生错误</td></tr>
+                    <tr><td>主要风险</td><td>Exposure bias</td><td>轨迹会过时，覆盖有限</td><td>教师错位、训练不稳定、成本高</td></tr>
+                </tbody>
+            </table>
+            <p>选型时不要先问“哪个方法最先进”，先问三个问题：</p>
+            <ol>
+                <li><strong>任务奖励是否可验证？</strong>数学、代码、工具调用通常比开放写作更容易验证。</li>
+                <li><strong>学生能否稳定生成可评价的轨迹？</strong>如果输出经常格式崩溃，先补 SFT 和格式约束。</li>
+                <li><strong>教师是否真正理解学生访问到的状态？</strong>多轮 Agent 中，学生早一步走错，后续状态可能已偏离教师熟悉范围。</li>
+            </ol>
+            <p>一个务实的默认路线是：<strong>先做小规模离线 Response Distillation，拿到可用基线；再针对失败样本比较固定学生轨迹蒸馏与 OPD；最后只为 OPD 确实有增益的任务支付在线成本。</strong></p>
+
+            <h2 id="research">五、2026 年的三篇论文，为什么值得连起来看？</h2>
+            <p>下面三篇预印本都在挑战“OPD 一定更好”的直觉。它们不是放之四海皆准的定律，而是给出了非常有用的<strong>边界条件</strong>。</p>
+
+            <h3>5.1 Semi-OPD：离线学生轨迹，常常比实时 OPD 更划算</h3>
+            <p><a href="https://arxiv.org/abs/2610.11291" target="_blank" rel="noopener">《When Do We Need On-Policy Distillation? Distilling on Offline Student Rollouts Is Often Better》</a>研究了 17 对教师—学生组合，参数规模从 1.5B 到 235B。论文报告：Semi-OPD 在 14 组中超过 OPD，最高带来 13.6% 的准确率提升和 11.4 倍训练加速。</p>
+            <p>关键不是“离线永远更好”，而是<strong>教师与初始学生的输出 Token 重叠率</strong>：两者高度对齐时，OPD 更容易受益；错位严重时，学生轨迹会越来越偏离教师熟悉的状态，教师监督反而变弱。Semi-OPD 在较短上下文上蒸馏，同时覆盖完整轨迹，往往更稳定。</p>
+            <blockquote>💡 <strong>OPD 里的 On-Policy，不只是“学生自己生成”，还要追问：这些状态是否也在教师的可靠覆盖范围内？</strong></blockquote>
+
+            <h3>5.2 Guided-OPD：多轮 Agent 要在关键时候把老师请回来</h3>
+            <p><a href="https://arxiv.org/abs/2606.15912" target="_blank" rel="noopener">《On-Policy Distillation with Curriculum Turn-level Guidance for Multi-turn Agents》</a>指出：多轮任务里，学生模型的早期错误会改变后续观察，让轨迹逐渐离开教师熟悉分布；学生最需要帮助的时候，恰恰也是老师最不可靠的时候。</p>
+            <p>Guided-OPD 的做法是在一次 rollout 中混合教师轮次与学生轮次，并让教师干预概率随课程逐渐衰减到零。论文在 ALFWorld、ScienceWorld、WebShop 上，将 Qwen3 学生从 Qwen3-30B-A3B 教师蒸馏，相对 vanilla OPD 平均提升 21.1% Score 和 25.5% Success Rate，较小的学生收益更大。</p>
+            <p>这给工程界的启发很直接：<strong>多轮 Agent 不要一上来就完全放养。</strong>早期用教师接管、关键步骤纠偏或高质量前缀把轨迹拉回正轨，再逐步减少干预，比全程让学生自己撞墙更稳。</p>
+
+            <h3>5.3 Training-Free OPD：不训练，也能合并同底座专家？</h3>
+            <p><a href="https://arxiv.org/abs/2610.22236" target="_blank" rel="noopener">《Training-Free On-Policy Distillation》</a>研究的是更特殊的场景：多个 Specialist 共享同一个 Base Model，希望把它们的能力合并进一个模型，又不想为每个老师执行完整的 rollout、教师前向和梯度更新。</p>
+            <p>在共享底座的条件下，作者给出逐层最小二乘解：让融合模型的每个线性层，在对应专家读取自身回答时的输入上，复现该专家的输出；所需统计可由少量前向计算获得。论文还发现，重复循环截断的回答虽然数量少，却占了大量 Token，清理这些轨迹对结果很关键。</p>
+            <p>但它的边界也必须说清：<strong>这不是“任意大小模型都能免费蒸馏”的通用方法。</strong>它依赖共享底座、可融合结构以及层-wise 求解条件；普通跨架构 logits 蒸馏或 API 教师场景，不能直接套用。</p>
+            <blockquote>💡 <strong>论文的结论越漂亮，越要先检查前提。Semi-OPD、Guided-OPD 和 Training-Free OPD 解决的是三种不同的错位，不是三个可以随便替换的开关。</strong></blockquote>
+
+            <h2 id="data">六、合成数据：真正该优化的，不是“题量”，而是“学习信号”</h2>
+            <p>用老师合成训练数据很容易掉进一个误区：题目越难越好、回答越长越好、数量越大越好。但蒸馏的目标不是制造一座数据仓库，而是制造<strong>学生能学到东西的训练状态</strong>。</p>
+            <p><a href="https://arxiv.org/abs/2610.27450" target="_blank" rel="noopener">Ask-to-Distill（A2D）</a>把问题看成“分布诱导器”：一道题的价值，不在于它看起来多难，而在于它能否让学生生成一条教师能提供有效监督的轨迹。方法不依赖标准答案，而是结合教师—学生分歧、教师落在学生候选支持上的概率质量，并加入长度与多样性控制，优化问题生成器。</p>
+            <p>论文报告：优化后的问题能让学生回答更短，同时激发更密集的累计监督；在数学、代码和 Agent 任务的评估设置中，优于未优化的学生生成问题和仅按 KL 筛选的真实问题，并匹配或超过真实题库 OPD。</p>
+            <p>把它翻译成工程语言，就是一条更靠谱的数据流水线：</p>
+            <pre><code>定义目标任务与验收集
+      ↓
+采集真实失败样本 + 合成问题
+      ↓
+格式过滤 / 毒性检测 / 隐私检查 / 去重
+      ↓
+学生生成轨迹
+      ↓
+教师反馈或自动验证
+      ↓
+训练 + 独立验证集回归
+      ↓
+只保留确实带来增益的数据</code></pre>
+            <p>这里最重要的不是某个奖励公式，而是闭环：<strong>数据生成 → 学生训练 → 独立评测 → 失败归因 → 数据修正。</strong>如果合成数据只增不减，没有真实任务回归，模型很容易在“老师喜欢的分布”上越来越强，在真实用户分布上越来越弱。</p>
+
+            <h2 id="engineering">七、工程实践：一个不玄学的蒸馏最小方案</h2>
+            <h3>第一步：先定义“学生必须保住什么”</h3>
+            <p>不要只追一个平均分。至少拆成：任务成功率、格式合法率、事实准确性、工具调用成功率、安全边界、长文本表现和小样本分群表现。蒸馏后允许丢一些泛化能力，但<strong>业务核心能力不能没有回退线</strong>。</p>
+
+            <h3>第二步：建立三个互不污染的集合</h3>
+            <table>
+                <thead>
+                    <tr><th>集合</th><th>用途</th><th>注意事项</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Train Set</td><td>学生训练、教师生成轨迹</td><td>允许难样本和合成样本</td></tr>
+                    <tr><td>Validation Set</td><td>调温度、学习率、干预比例</td><td>不要反复调到过拟合</td></tr>
+                    <tr><td>Test Set</td><td>最终验收与上线回归</td><td>训练、调参、教师生成都不能偷看</td></tr>
+                </tbody>
+            </table>
+
+            <h3>第三步：先跑简单基线</h3>
+            <ul>
+                <li>原始学生；</li>
+                <li>真实数据 SFT；</li>
+                <li>教师回答 SFT；</li>
+                <li>固定学生轨迹蒸馏；</li>
+                <li>小规模 OPD。</li>
+            </ul>
+            <p>如果教师回答 SFT 已经满足目标，就没必要为“先进”付出在线成本。如果连格式都学不会，先修数据和 SFT，不要急着上复杂算法。</p>
+
+            <h3>第四步：控制训练稳定性</h3>
+            <ul>
+                <li>冻结教师，记录教师版本；</li>
+                <li>监控 KL、熵、输出长度、重复率和验证集曲线；</li>
+                <li>设置早停，避免学生过度拟合教师口癖；</li>
+                <li>长轨迹先做长度控制，防止少量复读样本吃掉大部分 Token；</li>
+                <li>多轮 Agent 控制教师干预比例，从高到低退火；</li>
+                <li>每轮保留 checkpoint，异常时能回到上一个稳定点。</li>
+            </ul>
+
+            <h3>第五步：本地小模型要按“端到端”验收</h3>
+            <p>在本地部署时，不要只看离线 benchmark。还要测真实推理栈里的量化后精度、上下文长度、首字延迟、吞吐、内存峰值、工具 Schema 遵循和断网可用性。一个在 FP16 下很漂亮的学生，量化到 4-bit 后可能直接崩掉。</p>
+            <p>蒸馏和本站的 <a href="../application/model-routing-gateway.html">Model Routing & Gateway</a> 正好互补：蒸馏负责把一部分昂贵能力固化进便宜学生，路由负责判断哪些请求可以交给学生，哪些仍应升级到教师或旗舰模型。<strong>好的生产系统不追求“所有任务都用小模型”，而是追求“正确的任务用正确的模型”。</strong></p>
+
+            <h2 id="wuqu">八、常见误区</h2>
+            <h3>误区一：蒸馏就是把大模型压小</h3>
+            <p><strong>真相</strong>：压缩是量化、剪枝等结构手段；蒸馏是训练方法。两者可以组合，但不是同一件事。</p>
+
+            <h3>误区二：老师越强，学生一定学得越好</h3>
+            <p><strong>真相</strong>：教师—学生差距过大、词表不兼容或输出过度复杂，都可能让监督不可学。领域匹配和可学习性同样重要。</p>
+
+            <h3>误区三：OPD 一定比离线蒸馏好</h3>
+            <p><strong>真相</strong>：Semi-OPD 的结果已经说明，在不少师生组合上，固定初始学生轨迹更稳定、更高效。是否使用 OPD，要看任务、对齐程度和成本。</p>
+
+            <h3>误区四：合成题越多、越长，学习信号越多</h3>
+            <p><strong>真相</strong>：重复和冗长会稀释有效信号。A2D 的结论恰恰是，更短的回答也可能带来更密集、更有效的教师监督。</p>
+
+            <h3>误区五：学生在训练集上像老师，就等于能力迁移成功</h3>
+            <p><strong>真相</strong>：模仿口癖、格式和表面答案，不等于学会推理。必须在独立测试集、真实业务样本和安全边界上验收。</p>
+
+            <h3>误区六：Training-Free OPD 可以免费替代所有蒸馏</h3>
+            <p><strong>真相</strong>：该论文的方法有明确结构前提，主要针对共享底座的专家合并。把结论外推到任意 API 教师和任意学生，会翻车。</p>
+            <blockquote>💡 <strong>蒸馏的难点从来不是“让老师多说一点”，而是判断哪些监督信号对学生真正可学、可信、可泛化。</strong></blockquote>
+
+            <h2 id="jieyu">九、总结：好老师不是给答案，而是给学生合适的下一步</h2>
+            <p><strong>给小白的话</strong>：蒸馏就像一位强教练带新队员。直接把冠军的比赛录像放给他看，有帮助，但不够；更好的训练是让新队员自己上场，教练针对他真实出现的动作纠偏。知识蒸馏，就是把这种“因材施教”变成模型训练。</p>
+            <p><strong>给开发者的话</strong>：从真实任务和独立验收集出发，先做 Response Distillation 基线，再比较 Semi-OPD 与 Online OPD；多轮 Agent 考虑课程式教师干预，合成数据要围绕有效监督而非题量优化。最后用本地推理栈和业务回归验证，而不是只汇报一个 benchmark 涨幅。</p>
+            <blockquote>💡 <strong>蒸馏的终点不是“学生越来越像老师”，而是“学生在自己的舞台上，用更低的成本，稳定做出老师教得会的事”。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：<a href="https://arxiv.org/abs/2610.11291" target="_blank" rel="noopener">When Do We Need On-Policy Distillation? (arXiv:2610.11291)</a>；<a href="https://arxiv.org/abs/2606.15912" target="_blank" rel="noopener">Guided On-Policy Distillation (arXiv:2606.15912)</a>；<a href="https://arxiv.org/abs/2610.22236" target="_blank" rel="noopener">Training-Free On-Policy Distillation (arXiv:2610.22236)</a>；<a href="https://arxiv.org/abs/2610.27450" target="_blank" rel="noopener">Ask to Distill (arXiv:2610.27450)</a>。上述为预印本，结论应结合具体实验设置阅读。</p>
+
+            <nav class="article-nav">
+                <a href="multimodal.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🖼️ Multimodal</span>
+                    </span>
+                </a>
+            </nav>
+
+            <a href="foundation.html" class="back-link">← 返回 Foundation 专题</a>
+        </div>
+    </article>
+
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · kipozannaki</p>
+    </footer>
+</body>
+</html>
