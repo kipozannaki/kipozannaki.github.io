@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<!-- Frontier 专题文章页：RSI 递归自我改进的工程闭环 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSI · kipozannaki</title>
+    <meta name="description" content="为什么让 AI 自己变强，最难的不是训练，而是验证、回滚和记住为什么改？从 Jev 自动训练闭环到 Google RRSI / Dream-RSI / SIM。">
+    <!-- 跨页主题恢复：必须在 <link> 之前，避免 FOUC -->
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', saved || (sysDark ? 'dark' : 'light'));
+        } catch (e) { /* 隐私模式静默降级 */ }
+    })();
+    </script>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../index.html" class="logo">📚 kipozannaki</a>
+        <nav class="site-nav">
+            <a href="../application/application.html">Application</a>
+            <a href="../foundation/foundation.html">Foundation</a>
+            <a href="frontier.html" class="active">Frontier</a>
+            <a href="../local-ai-engineering/Local-AI-Engineering.html">Local AI Engineering</a>
+        </nav>
+        <div class="header-tools">
+            <button id="theme-toggle" class="tool-btn" type="button" title="切换暗色模式" aria-label="切换暗色模式">🌙</button>
+            <button id="reading-toggle" class="tool-btn" type="button" title="切换阅读模式" aria-label="切换阅读模式">📖</button>
+        </div>
+    </header>
+
+    <article class="article-page">
+        <header class="article-header">
+            <h1>🔁 RSI：递归自我改进的工程闭环</h1>
+            <p class="meta">为什么让 AI 自己变强，最难的不是训练，而是验证、回滚和记住为什么改？从 Jev 自动训练闭环到 Google RRSI / Dream-RSI / SIM · 双栖科普</p>
+        </header>
+        <div class="article-body">
+
+            <p class="toc">跳转：<a href="#intro">引言</a> · <a href="#zuobiao">坐标</a> · <a href="#bianjie">来源边界</a> · <a href="#xiatu">拆下层闭环</a> · <a href="#shangtu">拆上层规则</a> · <a href="#google">Google 三条路线</a> · <a href="#fanche">为什么翻车</a> · <a href="#shizhan">最小工程方案</a> · <a href="#wuqu">常见误区</a> · <a href="#jieyu">总结</a></p>
+
+            <h2 id="intro">零、引言：AI 自己改自己，为什么不是“永动机”？</h2>
+            <p>先扔几个问题：</p>
+            <ul>
+                <li>为什么模型已经能自己写代码、自己跑实验、自己看日志，却仍然不等于“智能爆炸”？</li>
+                <li>为什么一个自动训练闭环跑了一夜，benchmark 涨了，上线之后反而更差？</li>
+                <li>为什么“让 AI 改自己的 Prompt、工具、训练配置”比“让 AI 直接改权重”更容易落地？</li>
+                <li>为什么一张看起来很自动化的架构图里，偏偏要放“人签字”“元层不可写”“连续 2 轮 fail 自动停”？</li>
+                <li>为什么系统不仅要记住“改了什么”，还要记住“为什么改、预期修什么、实际有没有修好”？</li>
+            </ul>
+            <p>这些问题都指向 <strong>RSI（Recursive Self-Improvement，递归自我改进）</strong>：让 AI 系统参与改进 AI 系统，并把改进结果反馈到下一轮改进里。它不是“模型再回答一次”，也不是“跑一次微调”，而是<strong>把数据、训练、评测、发布和经验沉淀接成一个会持续转动的闭环</strong>。</p>
+            <blockquote>💡 <strong>RSI 的难点不是“让系统动起来”，而是“让系统知道什么叫变好了、什么时候该停、改坏了怎么退回去”。</strong></blockquote>
+
+            <h2 id="zuobiao">一、RSI 在 AI 工程体系里的坐标</h2>
+            <p>先把几个容易混在一起的概念切开：</p>
+            <table>
+                <thead>
+                    <tr><th>概念</th><th>主要改什么</th><th>和 RSI 的关系</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Prompt / Context Engineering</td><td>单次请求的输入与上下文</td><td>可以是 RSI 的优化对象，但本身不构成闭环</td></tr>
+                    <tr><td>Harness / Loop Engineering</td><td>Agent 外围的权限、工具、控制流、调度</td><td>RSI 最常见的落地层：改系统，而不一定改权重</td></tr>
+                    <tr><td>Knowledge Distillation / SFT</td><td>模型参数或行为分布</td><td>可以是 RSI 闭环里的“训练执行器”</td></tr>
+                    <tr><td>AutoML / HPO</td><td>超参数、结构或训练配置</td><td>是局部自动优化，不一定递归改进“优化过程本身”</td></tr>
+                    <tr><td>MLOps / CI/CD</td><td>数据、训练、评测、发布流水线</td><td>提供 RSI 所需的基础设施，但不自动等于 RSI</td></tr>
+                    <tr><td>RSI</td><td>改进过程本身：提案、选择、评测、记忆、发布</td><td>让上一轮改进影响下一轮怎么改进</td></tr>
+                </tbody>
+            </table>
+            <p>一篇综述把这条线画得更清楚：AI 自我改进可以改<strong>部署时的行为</strong>、<strong>训练后的策略</strong>、<strong>评测器</strong>，甚至<strong>研究过程本身</strong>；同时按闭环程度，从 human-in-the-loop 到完全闭合分层。真正危险的混淆，是把“有界自我 refinement”和“开放式递归自我改进”当成同一件事。</p>
+            <pre><code>单次任务优化        系统运行优化         改进过程优化
+Prompt / Context → Harness / Loop → RSI
+                         ↓
+              数据 → 训练 → 评测 → 发布 → 经验回流</code></pre>
+            <blockquote>💡 <strong>普通优化问“这次怎么做得更好”；RSI 问“下一轮该怎么更好地做优化”。</strong></blockquote>
+
+            <h2 id="bianjie">二、先拆来源边界：Jev、Google 研究和这张图不是一回事</h2>
+            <p>本文的出发点是一张演讲现场照片，标题是“RSI 总图：Jev 全自动训练闭环”。在解读之前，必须先把三个边界说清楚：</p>
+            <table>
+                <thead>
+                    <tr><th>对象</th><th>能确认什么</th><th>不能直接推断什么</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Jev</td><td>TypeSafe AI 的 System One 决策模型，输入 state 和 typed questions，返回 Choice / Score / Noul / Box 等结构化结果</td><td>不是 Google 官方模型；也不能直接推断商业 API 可被用户 LoRA 续训</td></tr>
+                    <tr><td>Google 公开研究</td><td>RRSI、Dream-RSI、SIM 等论文/代码涉及 Google Research、Google DeepMind、Google Cloud AI 等团队</td><td>不等于 Google 已发布一个名为“Jev 全自动训练闭环”的官方产品</td></tr>
+                    <tr><td>演讲架构图</td><td>展示了一个把数据飞轮、后训练、门禁、灰度、元优化串起来的工程蓝图</td><td>图中组件和阈值是示意，不是本文能证实的线上生产配置</td></tr>
+                </tbody>
+            </table>
+            <p>所以本文的读法是：<strong>把图当作“Jev 式决策模型如何被持续训练和治理”的工程示意</strong>，再用 Google 公开论文和云文档去核对其中每一层到底在解决什么问题。如果图里的 Jev 指 TypeSafe 商业 API，那么“续训 LoRA”更应理解为对一类可训练决策模型角色的描述，而不是对官方 Jev 服务能力的断言。</p>
+            <blockquote>💡 <strong>看 RSI 架构图，先问“谁改谁、谁验谁、谁能回滚”，再问“这是不是某家公司的官方路线图”。</strong></blockquote>
+
+            <h2 id="xiatu">三、拆下层闭环：一条“全自动训练”流水线到底在做什么？</h2>
+            <figure style="margin: 24px 0; text-align: center;">
+                <a href="assets/rsi-jev-loop.jpg" target="_blank" rel="noopener">
+                    <img src="assets/rsi-jev-loop.jpg" alt="RSI 总图：上层规则自学，下层 Jev 全自动训练闭环。包含 Eventarc、Sensitive Data Protection、Batch Prediction、BigQuery、LoRA、Model Registry、Endpoint 灰度、回流和监控等组件。" style="width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border);">
+                </a>
+                <figcaption style="margin-top: 8px; font-size: 0.85rem; color: var(--text-light); line-height: 1.6;">用户提供的演讲现场照片：上层“规则自学”，下层“Jev 全自动训练闭环”。图中组件为架构示意，不代表 Google 官方产品路线图；Jev 为 TypeSafe 的 System One 决策模型。</figcaption>
+            </figure>
+            <p>下层闭环可以拆成四段：</p>
+            <table>
+                <thead>
+                    <tr><th>阶段</th><th>图中组件</th><th>工程含义</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>数据入口</td><td>冷启动冻结考卷、Eventarc、Sensitive Data Protection、Cloud Storage</td><td>先固定一把不会偷偷变化的尺子，再让新数据触发流水线；原始数据只写一次，入库前做敏感数据检查与去标识化</td></tr>
+                    <tr><td>标签与训练集</td><td>Batch Prediction 补标与合成、BigQuery 反向质检、新旧 1:1 组训练集</td><td>用批量推理补标签或合成样本，再反向检查一致性、重复、泄漏和分布漂移；新旧混合是为了降低遗忘和偏科</td></tr>
+                    <tr><td>训练与门禁</td><td>LoRA / Custom Training、门禁、Model Registry</td><td>用参数高效微调降低续训成本；候选模型必须过门禁才能注册，失败样本也可以回流成负样本</td></tr>
+                    <tr><td>发布与回流</td><td>灰度 10% Endpoint、转正 champion、日志改判、BigQuery 定时监控</td><td>先小流量验证，再转正；线上日志和人工改判回流，监控发现漂移或异常就触发下一轮或回滚</td></tr>
+                </tbody>
+            </table>
+            <p>用一条更短的链路看：</p>
+            <pre><code>新数据 / 漂移信号
+      ↓
+Eventarc 触发 → 脱敏入库 → 补标 / 合成 → 反向质检
+      ↓
+组训练集 → LoRA 续训 → 门禁 → Model Registry
+      ↓
+灰度 10% → 转正 / 回滚 → 日志改判 → 监控 → 下一轮</code></pre>
+            <p>这里有三个特别值得停下来的设计：</p>
+            <ul>
+                <li><strong>冻结考卷</strong>：冷启动时冻结约 1000 条考卷，本质是建立一个不被训练过程污染的锚点。没有它，系统很容易“越练越会考试，越考越不像真实业务”。</li>
+                <li><strong>fail 也回流</strong>：图里把失败也注册、回到合成/质检，意味着失败不是垃圾，而是负样本、触发条件和下一轮提案的依据。</li>
+                <li><strong>新旧 1:1</strong>：这不是普适最优比例，而是一种防止训练集被最新合成数据完全占领的保守策略。真正该监控的是分布、重复率、泄漏和独立验收集表现。</li>
+            </ul>
+            <blockquote>💡 <strong>自动训练闭环最值钱的不是“自动跑 LoRA”，而是“每次跑之前知道用什么尺子量，跑完之后知道失败去哪”。</strong></blockquote>
+
+            <h2 id="shangtu">四、拆上层规则：为什么“元层不可写”比“全自动”更重要？</h2>
+            <p>上层不是再训练一个模型，而是优化“下层该怎么跑”的规则：训练集配比、选父策略、评测与 Prompt。图中给这条元优化链路加了四道关：</p>
+            <table>
+                <thead>
+                    <tr><th>关卡</th><th>图中名称</th><th>防止什么</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>关 1</td><td>离线重放</td><td>新配置先在历史记录上重放，避免直接拿线上流量试错</td></tr>
+                    <tr><td>关 2</td><td>影子轮</td><td>候选配置旁路运行，不直接影响用户，先比较结果</td></tr>
+                    <tr><td>关 3</td><td>元留出集</td><td>防止元优化只拟合当前评测集，换一批任务就失效</td></tr>
+                    <tr><td>关 4</td><td>人签字</td><td>规则层变更必须可审计、可追责，不能由模型悄悄改掉</td></tr>
+                </tbody>
+            </table>
+            <p>旁边还有三个保险丝：<strong>新配置可回滚</strong>、<strong>元回退：变差就退回</strong>、<strong>锚点：元层不可写</strong>。最后一条最关键：如果元 Agent 不仅能改训练配置，还能改“什么叫改好了”的评测标准，那它就可以通过降低标准来让自己永远成功。</p>
+            <p>这和下层闭环形成一种分层：</p>
+            <pre><code>上层：慢变量 —— 规则、配比、评测、Prompt
+      离线重放 → 影子轮 → 元留出集 → 人签字 → 可回滚
+      锚点：元层不可写
+
+下层：快变量 —— 数据、标签、LoRA、灰度、回流
+      触发 → 训练 → 门禁 → 注册 → 灰度 → 转正 / 回滚</code></pre>
+            <blockquote>💡 <strong>下层可以自动跑，上层必须可审计；模型可以改配置，不能改“什么叫改好了”。</strong></blockquote>
+
+            <h2 id="google">五、Google 的三条公开路线：RRSI、Dream-RSI、SIM</h2>
+            <p>如果把图中的工程蓝图和 Google 公开研究对照，会发现它们分别在拆三个不同的坎：</p>
+            <table>
+                <thead>
+                    <tr><th>路线</th><th>改什么</th><th>关键机制</th><th>论文报告的结果</th><th>边界</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><a href="https://arxiv.org/abs/2609.24972" target="_blank" rel="noopener">RRSI</a></td><td>Agent Harness</td><td>退火编辑预算、历史条件提案、critic 筛查、pruner 剪枝、噪声带与成本规则</td><td>8 个 benchmark 上，演化集最高 +6.0 分，5 个 OOD benchmark 最高 +4.3 分，policy token 减少约 30%</td><td>仍是固定模型外围的 harness 优化，不是权重级自我重写</td></tr>
+                    <tr><td><a href="https://arxiv.org/abs/2609.14858" target="_blank" rel="noopener">Dream-RSI</a></td><td>探索策略 / 元层调度</td><td>把历史 discovery tree 变成 replay simulator，离线“做梦”评估候选策略，再部署更优策略</td><td>9 个任务 4 个领域；KernelBench 上同等效果生成调用减少 1.79–2.43 倍，或同等预算性能最高 2.09 倍；TB2.1 harness 从 0.7247 到 0.8090</td><td>重放只能覆盖已记录的历史空间，不能凭空模拟未探索分支</td></tr>
+                    <tr><td><a href="https://arxiv.org/abs/2611.18856" target="_blank" rel="noopener">SIM / CRSI</a></td><td>优化器的记忆</td><td>按 harness 问题分组，记录 rationale、预测/实际结果、评测上下文和 provenance</td><td>跨数据集/跨模型继续优化优于只继承 harness；coding 10 组独立源运行中 9 组更好，平均 +2.36 分，p=0.003</td><td>记忆给优化器用，不是给任务模型当聊天历史；迁移仍依赖兼容接口</td></tr>
+                </tbody>
+            </table>
+            <p>三条路线连起来看，正好对应图里的三层问题：</p>
+            <ul>
+                <li><strong>RRSI 回答“怎么改才不会过拟合”</strong>：不是禁止改 harness，而是约束搜索轨迹，让改动更像可复用机制，而不是背题。</li>
+                <li><strong>Dream-RSI 回答“怎么便宜地试很多改法”</strong>：把昂贵的在线探索变成可重放的历史世界，让元层策略先在梦里比赛。</li>
+                <li><strong>SIM 回答“换模型/换任务后，过去的经验怎么继承”</strong>：只继承最终 harness 不够，还要继承为什么改、预期修什么、实际修没修好。</li>
+            </ul>
+            <p>它们都很强，但也都还是<strong>有界 RSI</strong>：评测器、任务接口、预算和停止条件大多仍由人设定。距离“AI 完全自主决定研究方向、自己造下一代模型”的开放式 RSI，还有很远的距离。</p>
+            <blockquote>💡 <strong>Google 这几篇论文最值得抄的不是“全自动”，而是“正则化搜索、历史重放、改进记忆”这三个工程动作。</strong></blockquote>
+
+            <h2 id="fanche">六、为什么 RSI 最容易翻车？</h2>
+            <h3>翻车一：验证器被优化掉了</h3>
+            <p><strong>现场</strong>：系统每轮都“通过评测”，但真实任务成功率没涨，甚至下降。<br>
+            <strong>根因</strong>：优化器学会了迎合评测器，而不是解决任务；如果评测器本身也能被改，闭环就会变成自我确认。<br>
+            <strong>解法</strong>：评测锚点不可写，独立验收集不进训练，元层变更人审；用形式验证、执行结果、人工抽检等更强信号替代模型自评。</p>
+
+            <h3>翻车二：合成数据越滚越偏</h3>
+            <p><strong>现场</strong>：自动合成训练集越来越大，模型输出越来越像同一种口癖，长尾任务崩掉。<br>
+            <strong>根因</strong>：递归生成数据会放大分布偏差，重复和冗长样本吃掉有效信号；新旧比例失衡还会造成遗忘。<br>
+            <strong>解法</strong>：去重、长度控制、隐私检查、分布监控、新旧混合、独立回归；只保留确实带来增益的数据。</p>
+
+            <h3>翻车三：跨模型迁移变成负收益</h3>
+            <p><strong>现场</strong>：在 A 模型上演化出的 harness，换到 B 模型后起点反而低于原始 seed。<br>
+            <strong>根因</strong>：harness 改动和模型行为耦合；只继承代码，不继承诊断和结果，优化器不知道哪些该留、哪些该改。<br>
+            <strong>解法</strong>：像 SIM 一样记录问题、理由、预测/实际结果和上下文；迁移后先做目标域回归，再决定保留、修订、替换或删除。</p>
+
+            <h3>翻车四：元搜索成本爆炸</h3>
+            <p><strong>现场</strong>：为了优化“怎么探索”，系统自己先跑了几千轮昂贵实验，账单比收益还大。<br>
+            <strong>根因</strong>：元层反馈延迟且昂贵，策略空间巨大；没有重放和预算约束，RSI 会变成烧钱循环。<br>
+            <strong>解法</strong>：历史重放、影子轮、候选预算、噪声带、成本规则、连续失败自动停。</p>
+            <blockquote>💡 <strong>RSI 的失败往往不是“不够聪明”，而是“太会让自己看起来聪明”。</strong></blockquote>
+
+            <h2 id="shizhan">七、工程实践：一个不玄学的最小 RSI 闭环</h2>
+            <p>不要一上来就做“AI 自己造 AI”。先做一个可审计、可回滚、可停止的最小闭环：</p>
+            <ol>
+                <li><strong>冻结锚点</strong>：固定一批不进训练、不参与调参的考卷，覆盖业务核心能力、安全边界和长尾分群。</li>
+                <li><strong>数据版本化</strong>：原始数据只写一次，脱敏后再入库；每轮训练集记录来源、合成比例、去重和泄漏检查。</li>
+                <li><strong>有限候选</strong>：每轮只允许少量候选配置/模型，编辑预算随轮次退火，避免一次 bundle 太多改动。</li>
+                <li><strong>独立评测</strong>：演化集用于提案，留出集用于选择，线上灰度用于最终验收；增益必须超过噪声带。</li>
+                <li><strong>门禁与回滚</strong>：安全、格式、成本、延迟任一红线退化就拒绝；灰度异常或连续失败自动回滚。</li>
+                <li><strong>记录为什么改</strong>：每个被接受的改动记录 root cause、rationale、预期修复、实际结果和评测上下文。</li>
+                <li><strong>元层人审</strong>：评测标准、配比规则、选父策略、停止条件的变更必须可审计，必要时人签字。</li>
+            </ol>
+            <p>一个示意配置可以长这样：</p>
+            <pre><code>rsi_run:
+  anchor_eval: frozen_1000_examples
+  evolve_set: weekly_failure_samples
+  holdout_set: never_used_for_training
+  candidate_budget: 2
+  max_rounds: 5
+  accept_if:
+    - holdout_score &gt; baseline + noise_band
+    - no_safety_regression
+    - cost_per_success &lt;= budget
+  rollback_if:
+    - online_error_rate &gt; threshold
+    - two_consecutive_failures
+  meta_changes:
+    require_human_approval: true
+    immutable: [anchor_eval, safety_redlines]</code></pre>
+            <p>指标至少分四层：</p>
+            <table>
+                <thead>
+                    <tr><th>层级</th><th>看什么</th><th>回答什么</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>任务质量</td><td>成功率、格式合法率、事实准确性、安全边界、分群表现</td><td>真的变好了吗？</td></tr>
+                    <tr><td>改进过程</td><td>候选接受率、重复提案率、编辑预算、噪声带、元留出集</td><td>优化器在学机制，还是在背题？</td></tr>
+                    <tr><td>系统可靠性</td><td>灰度异常率、回滚次数、连续失败、触发器健康</td><td>闭环会不会瞎跑？</td></tr>
+                    <tr><td>成本效率</td><td>每成功任务成本、训练/评测/重放成本、Token 趋势</td><td>变强是否值得？</td></tr>
+                </tbody>
+            </table>
+            <blockquote>💡 <strong>最小 RSI 不是“最少功能”，而是“最少不可审计环节”。</strong></blockquote>
+
+            <h2 id="wuqu">八、常见误区</h2>
+            <h3>误区一：RSI 就是模型自己改权重</h3>
+            <p><strong>真相</strong>：权重更新只是其中一种。更常见的落地是改 harness、Prompt、工具、训练配置、评测流程和改进记忆。</p>
+
+            <h3>误区二：全自动闭环就不需要人</h3>
+            <p><strong>真相</strong>：人可以从每轮操作里退出，但不能从锚点、红线、元层变更和异常仲裁里退出。图里的“人签字”不是落后，是治理。</p>
+
+            <h3>误区三：benchmark 涨了就是能力涨了</h3>
+            <p><strong>真相</strong>：演化集涨幅可能来自过拟合；必须看 OOD、线上灰度、分群和安全边界。RRSI 的核心动机之一就是治这个。</p>
+
+            <h3>误区四：合成数据越多，RSI 越强</h3>
+            <p><strong>真相</strong>：递归生成数据可能带来 collapse、重复和偏科。数据要按有效学习信号筛选，而不是按体积堆。</p>
+
+            <h3>误区五：元 Agent 可以顺便改评测标准</h3>
+            <p><strong>真相</strong>：一旦优化器能改“什么叫成功”，闭环就可能自我确认。元层不可写、锚点冻结、人审是底线。</p>
+
+            <h3>误区六：Jev 是 Google 模型，或 Google 已实现完全 RSI</h3>
+            <p><strong>真相</strong>：Jev 是 TypeSafe 的 System One 决策模型；Google 公开的是 RRSI、Dream-RSI、SIM 等有界自我改进研究。演讲图是工程示意，不是官方产品路线图。</p>
+            <blockquote>💡 <strong>RSI 的成熟度，不看它能不能自己跑，而看它能不能证明自己没有骗自己。</strong></blockquote>
+
+            <h2 id="jieyu">九、总结：让系统变强，先让系统诚实</h2>
+            <p><strong>给小白的话</strong>：RSI 像一个会自己复盘的实习团队：干活、检查、改方法、再干活。但真正靠谱的团队不是“永远说自己进步了”，而是有固定考核、有失败记录、有回滚机制，并且知道哪些规则不能自己偷偷改。</p>
+            <p><strong>给开发者的话</strong>：先把数据、训练、评测、发布接成可审计闭环，再谈递归优化；先做 harness/配置层的有界 RSI，再谈权重级自我改进；先冻结锚点和元层红线，再放自动候选。RRSI 教你正则化搜索，Dream-RSI 教你用历史重放降低元搜索成本，SIM 教你把“为什么改”变成可继承资产。</p>
+            <blockquote>💡 <strong>RSI 的终点不是“AI 终于不需要人”，而是“AI 能在人设定的诚实边界里，持续把改进变成可验证的复利”。</strong></blockquote>
+
+            <p class="refs"><strong>参考资料</strong>：<a href="https://arxiv.org/abs/2609.24972" target="_blank" rel="noopener">RRSI: Regularized Recursive Self-Improvement of Agent Harnesses</a>；<a href="https://github.com/google-research/rrsi" target="_blank" rel="noopener">google-research/rrsi</a>；<a href="https://arxiv.org/abs/2609.14858" target="_blank" rel="noopener">Dream-RSI: Recursive Self-Improvement through Evolving Worlds</a>；<a href="https://arxiv.org/abs/2611.18856" target="_blank" rel="noopener">Self-Improvement Memory Enables Continual Recursive Self-Improvement</a>；<a href="https://arxiv.org/abs/2607.07663" target="_blank" rel="noopener">Recursive Self-Improvement in AI: From Bounded Self-Refinement to Autonomous Research Loops</a>；<a href="https://arxiv.org/abs/2609.36054" target="_blank" rel="noopener">What if automating AI R&amp;D triggers an intelligence explosion?</a>；<a href="https://docs.typesafe.ai/" target="_blank" rel="noopener">TypeSafe Jev 官方文档</a>；<a href="https://docs.cloud.google.com/eventarc/docs/overview" target="_blank" rel="noopener">Eventarc</a>、<a href="https://cloud.google.com/sensitive-data-protection/docs" target="_blank" rel="noopener">Sensitive Data Protection</a>、<a href="https://docs.cloud.google.com/vertex-ai/docs/predictions/batch-predictions" target="_blank" rel="noopener">Batch Prediction</a>、<a href="https://docs.cloud.google.com/vertex-ai/docs/model-registry/introduction" target="_blank" rel="noopener">Model Registry</a>、<a href="https://cloud.google.com/blog/products/ai-machine-learning/master-gemini-sft" target="_blank" rel="noopener">Gemini SFT / LoRA</a>。演讲架构图为用户提供的现场照片，本文按工程示意解读。</p>
+
+            <!-- 跨文章导航：上一站 + 返回专题 -->
+            <nav class="article-nav">
+                <a href="looped-transformer.html" class="nav-card nav-prev">
+                    <span class="nav-arrow">←</span>
+                    <span class="nav-content">
+                        <span class="nav-label">上一篇</span>
+                        <span class="nav-title">🌀 Looped Transformer</span>
+                    </span>
+                </a>
+                <a href="frontier.html" class="nav-card nav-next">
+                    <span class="nav-content">
+                        <span class="nav-label">返回专题</span>
+                        <span class="nav-title">🔭 Frontier</span>
+                    </span>
+                    <span class="nav-arrow">→</span>
+                </a>
+            </nav>
+
+            <a href="frontier.html" class="back-link">← 返回 Frontier 专题</a>
+        </div>
+    </article>
+
+    <script>
+    (function() {
+        const safeGet = function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } };
+        const safeSet = function(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 静默降级 */ } };
+        const themeBtn = document.getElementById('theme-toggle');
+        const readBtn = document.getElementById('reading-toggle');
+        if (document.documentElement.getAttribute('data-theme') === 'dark') themeBtn.classList.add('active');
+        if (safeGet('reading') === '1') {
+            document.body.classList.add('reading-mode');
+            readBtn.classList.add('active');
+        }
+        themeBtn.addEventListener('click', function() {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            themeBtn.classList.toggle('active');
+            safeSet('theme', next);
+        });
+        readBtn.addEventListener('click', function() {
+            document.body.classList.toggle('reading-mode');
+            const on = document.body.classList.contains('reading-mode');
+            readBtn.classList.toggle('active');
+            safeSet('reading', on ? '1' : '0');
+        });
+    })();
+    </script>
+
+    <!-- 表格移动端兜底：自动给未被包裹的 table 套 .table-scroll 滚动容器 -->
+    <script>
+    (function() {
+        document.querySelectorAll('.article-body table').forEach(function(t) {
+            if (t.parentElement && t.parentElement.classList.contains('table-scroll')) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'table-scroll';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        });
+    })();
+    </script>
+
+    <footer class="site-footer">
+        <p>© 2026 · <a href="https://github.com/kipozannaki/kipozannaki.github.io" target="_blank" rel="noopener">Built with ❤️</a> by kipozannaki</p>
+    </footer>
+</body>
+</html>
